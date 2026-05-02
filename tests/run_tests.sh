@@ -50,11 +50,11 @@ cleanup() {
 trap cleanup EXIT
 
 # Run individual test files
-printf '%b' "${YELLOW}Running pvm tests...${RESET}\n\n"
+printf '%bRunning pvm tests...%b\n\n' "${YELLOW}" "${RESET}"
 
 for test_file in "${SCRIPT_DIR}"/test_*.sh; do
 	[ -f "$test_file" ] || continue
-	printf '%b' "${YELLOW}--- %s ---${RESET}\n" "$(basename "$test_file")"
+printf '%b--- %s ---%b\n' "${YELLOW}" "$(basename "$test_file")" "${RESET}"
 	# shellcheck source=/dev/null
 	. "$test_file"
 	printf "\n"
@@ -65,9 +65,9 @@ set +euo pipefail
 # Summary
 printf "\n%b======================%b\n" "${YELLOW}" "${RESET}"
 printf "Tests run:    %d\n" "$TESTS_RUN"
-printf '%b' "${GREEN}Passed:       %d${RESET}\n" "$TESTS_PASSED"
+printf '%bPassed:       %d%b\n' "${GREEN}" "$TESTS_PASSED" "${RESET}"
 if [ "$TESTS_FAILED" -gt 0 ]; then
-	printf '%b' "${RED}Failed:       %d${RESET}\n" "$TESTS_FAILED"
+printf '%bFailed:       %d%b\n' "${RED}" "$TESTS_FAILED" "${RESET}"
 	printf "\nFailures:\n"
 	printf '%b\n' "$FAILURES"
 	exit 1
