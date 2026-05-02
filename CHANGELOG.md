@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
 - Fixed all 36 pre-existing shellcheck findings (warnings + info) across the project
 ### Added
 
