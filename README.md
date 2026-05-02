@@ -3,7 +3,7 @@
 [![CI](https://github.com/TheSmuks/pvm/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSmuks/pvm/actions/workflows/ci.yml)
 [![Commit Lint](https://github.com/TheSmuks/pvm/actions/workflows/commit-lint.yml/badge.svg)](https://github.com/TheSmuks/pvm/actions/workflows/commit-lint.yml)
 [![License](https://img.shields.io/badge/license-MPL%2FLGPL%2FGPL-blue)](https://github.com/TheSmuks/pvm/blob/main/LICENSE)
-[![Shell](https://img.shields.io/badge/shell-bash%2Fzsh-4EAA25?logo=gnubash&logoColor=white)
+![Shell](https://img.shields.io/badge/shell-bash%2Fzsh-4EAA25?logo=gnubash&logoColor=white)
 
 A version manager for [Pike](https://pike.lysator.liu.se/), modeled after [nvm](https://github.com/nvm-sh/nvm).
 
