@@ -1,0 +1,85 @@
+# shellcheck shell=bash
+# bash_completion — Tab completion for pvm
+# Source from ~/.bashrc: [ -s "$PVM_DIR/bash_completion" ] && . "$PVM_DIR/bash_completion"
+
+_pvm_completions() {
+	local cur prev commands
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+
+	commands="install use current ls ls-remote uninstall alias unalias default run exec which deactivate cache debug unload version help"
+
+	# First command completion
+	if [ "$COMP_CWORD" -eq 1 ]; then
+		COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+		return 0
+	fi
+
+	local command="${COMP_WORDS[1]}"
+
+	case "$command" in
+		install)
+			if [ "$prev" = "install" ]; then
+				# Suggest --source, --binary, --latest, or versions
+				local installed=""
+				if [ -d "${PVM_DIR:-$HOME/.pvm}/versions" ]; then
+					installed="$(ls "${PVM_DIR:-$HOME/.pvm}/versions/" 2>/dev/null | tr '\n' ' ')"
+				fi
+				COMPREPLY=($(compgen -W "--source --binary --latest $installed" -- "$cur"))
+			fi
+			;;
+		use|uninstall|run|exec|which)
+			if [ "$prev" = "$command" ]; then
+				# Complete with installed versions
+				if [ -d "${PVM_DIR:-$HOME/.pvm}/versions" ]; then
+					local versions
+					versions="$(ls "${PVM_DIR:-$HOME/.pvm}/versions/" 2>/dev/null | tr '\n' ' ')"
+					# Also add aliases
+					local aliases=""
+					if [ -d "${PVM_DIR:-$HOME/.pvm}/alias" ]; then
+						aliases="$(ls "${PVM_DIR:-$HOME/.pvm}/alias/" 2>/dev/null | tr '\n' ' ')"
+					fi
+					COMPREPLY=($(compgen -W "$versions $aliases" -- "$cur"))
+				fi
+			fi
+			;;
+		alias)
+			if [ "$prev" = "alias" ]; then
+				# Complete with alias names
+				if [ -d "${PVM_DIR:-$HOME/.pvm}/alias" ]; then
+					local aliases
+					aliases="$(ls "${PVM_DIR:-$HOME/.pvm}/alias/" 2>/dev/null | tr '\n' ' ')"
+					COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
+				fi
+			elif [ "$COMP_CWORD" -eq 3 ]; then
+				# Complete version for alias set
+				if [ -d "${PVM_DIR:-$HOME/.pvm}/versions" ]; then
+					local versions
+					versions="$(ls "${PVM_DIR:-$HOME/.pvm}/versions/" 2>/dev/null | tr '\n' ' ')"
+					COMPREPLY=($(compgen -W "$versions" -- "$cur"))
+				fi
+			fi
+			;;
+		unalias|default)
+			if [ "$prev" = "$command" ]; then
+				if [ -d "${PVM_DIR:-$HOME/.pvm}/alias" ]; then
+					local aliases
+					aliases="$(ls "${PVM_DIR:-$HOME/.pvm}/alias/" 2>/dev/null | tr '\n' ' ')"
+					COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
+				fi
+			fi
+			;;
+		ls|ls-remote)
+			# No meaningful completion
+			;;
+		cache)
+			if [ "$prev" = "cache" ]; then
+				COMPREPLY=($(compgen -W "dir clear" -- "$cur"))
+			fi
+			;;
+	esac
+
+	return 0
+}
+
+complete -F _pvm_completions pvm

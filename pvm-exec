@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# pvm-exec — Run a command with a specific Pike version on PATH
+# Usage: pvm-exec <version> <command> [args...]
+#
+# This is called by `pvm exec` and `pvm run` to run commands in a subshell
+# with the specified Pike version's bin directory prepended to PATH.
+
+set -euo pipefail
+
+PVM_DIR="${PVM_DIR:-$HOME/.pvm}"
+
+if [ $# -lt 2 ]; then
+	echo "pvm-exec: usage: pvm-exec <version> <command> [args...]" >&2
+	exit 1
+fi
+
+VERSION="$1"
+shift
+
+BIN_PATH="${PVM_DIR}/versions/${VERSION}/bin"
+
+if [ ! -x "${BIN_PATH}/pike" ]; then
+	echo "pvm-exec: Pike ${VERSION} is not installed" >&2
+	exit 1
+fi
+
+export PATH="${BIN_PATH}:${PATH}"
+exec "$@"

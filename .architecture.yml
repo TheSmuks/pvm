@@ -1,0 +1,18 @@
+# Code quality thresholds for this project.
+
+# File size limits
+max_file_lines: 800          # Shell scripts tend to be longer; nvm is ~3000 lines
+max_file_lines_hard: 3000     # Hard limit — exceeding is a CI warning
+
+# Function size limits
+max_function_lines: 80        # Shell functions tend to be longer
+
+# Module complexity
+max_exports: 30               # pvm has many subcommands
+max_nesting_depth: 5          # Shell scripts need a bit more nesting
+
+# File patterns to exclude from checks
+ignore_patterns:
+  - "**/*.generated.*"
+  - "**/vendor/**"
+  - "docs/**"
