@@ -3,11 +3,12 @@
 # Sourced by run_tests.sh
 
 test_find_pikerc_in_current_dir() {
-	local test_dir="$(mktemp -d)"
+	local test_dir
+	test_dir="$(mktemp -d)"
 	printf '8.0.1116\n' > "${test_dir}/.pikerc"
 
 	local old_pwd="$PWD"
-	cd "$test_dir"
+	cd "$test_dir" || return
 
 	local result
 	result="$(pvm_find_pikerc)"
@@ -18,18 +19,19 @@ test_find_pikerc_in_current_dir() {
 		fail "should find .pikerc in current dir, got '$result'"
 	fi
 
-	cd "$old_pwd"
+	cd "$old_pwd" || return
 	rm -rf "$test_dir"
 }
 
 test_find_pikerc_in_parent_dir() {
-	local test_dir="$(mktemp -d)"
+	local test_dir
+	test_dir="$(mktemp -d)"
 	local child_dir="${test_dir}/child"
 	mkdir -p "$child_dir"
 	printf '8.0.1732\n' > "${test_dir}/.pikerc"
 
 	local old_pwd="$PWD"
-	cd "$child_dir"
+	cd "$child_dir" || return
 
 	local result
 	result="$(pvm_find_pikerc)"
@@ -40,14 +42,15 @@ test_find_pikerc_in_parent_dir() {
 		fail "should find .pikerc in parent dir, got '$result'"
 	fi
 
-	cd "$old_pwd"
+	cd "$old_pwd" || return
 	rm -rf "$test_dir"
 }
 
 test_find_pikerc_not_found() {
-	local test_dir="$(mktemp -d)"
+	local test_dir
+	test_dir="$(mktemp -d)"
 	local old_pwd="$PWD"
-	cd "$test_dir"
+	cd "$test_dir" || return
 
 	local result
 	if result="$(pvm_find_pikerc 2>/dev/null)"; then
@@ -58,16 +61,17 @@ test_find_pikerc_not_found() {
 		pass
 	fi
 
-	cd "$old_pwd"
+	cd "$old_pwd" || return
 	rm -rf "$test_dir"
 }
 
 test_read_pikerc() {
-	local test_dir="$(mktemp -d)"
+	local test_dir
+	test_dir="$(mktemp -d)"
 	printf '8.0.1116\n' > "${test_dir}/.pikerc"
 
 	local old_pwd="$PWD"
-	cd "$test_dir"
+	cd "$test_dir" || return
 
 	local result
 	result="$(pvm_read_pikerc)"
@@ -78,7 +82,7 @@ test_read_pikerc() {
 		fail "read_pikerc should return '8.0.1116', got '$result'"
 	fi
 
-	cd "$old_pwd"
+	cd "$old_pwd" || return
 	rm -rf "$test_dir"
 }
 
@@ -88,7 +92,7 @@ test_read_pikerc_with_comments() {
 	printf '# This is a comment\n8.0.1732\n' > "${test_dir}/.pikerc"
 
 	local old_pwd="$PWD"
-	cd "$test_dir"
+	cd "$test_dir" || return
 
 	local result
 	result="$(pvm_read_pikerc)"
@@ -99,7 +103,7 @@ test_read_pikerc_with_comments() {
 		fail "read_pikerc should skip comments and return '8.0.1732', got '$result'"
 	fi
 
-	cd "$old_pwd"
+	cd "$old_pwd" || return
 	rm -rf "$test_dir"
 }
 

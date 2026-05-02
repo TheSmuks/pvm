@@ -7,6 +7,8 @@
 
 # Guard against double-sourcing
 if [ -n "${_PVM_LOADED:-}" ]; then
+
+	# shellcheck disable=SC2317
 	return 0 2>/dev/null || :
 fi
 _PVM_LOADED=1
@@ -770,9 +772,126 @@ pvm_prepend_version_to_path() {
 	export PATH
 
 	# Clear command hash table
+	pvm_set_pike_env "$version"
 	hash -r 2>/dev/null || true
 }
 
+pvm_strip_pike_env() {
+	# Strip pvm entries from PIKE_MODULE_PATH
+	if [ -n "${PIKE_MODULE_PATH:-}" ]; then
+		local new_path=""
+		local IFS=':'
+		local -a path_entries
+		read -ra path_entries <<< "$PIKE_MODULE_PATH"
+		local entry
+		for entry in "${path_entries[@]}"; do
+			case "$entry" in
+				"${PVM_DIR}/versions/"*)
+					# Skip pvm version paths
+					;;
+				*)
+					if [ -z "$new_path" ]; then
+						new_path="$entry"
+					else
+						new_path="${new_path}:${entry}"
+					fi
+					;;
+			esac
+		done
+		if [ -n "$new_path" ]; then
+			PIKE_MODULE_PATH="$new_path"
+		else
+			unset PIKE_MODULE_PATH
+		fi
+	fi
+
+	# Strip pvm entries from PIKE_INCLUDE_PATH
+	if [ -n "${PIKE_INCLUDE_PATH:-}" ]; then
+		local new_path=""
+		local IFS=':'
+		local -a path_entries
+		read -ra path_entries <<< "$PIKE_INCLUDE_PATH"
+		local entry
+		for entry in "${path_entries[@]}"; do
+			case "$entry" in
+				"${PVM_DIR}/versions/"*)
+					# Skip pvm version paths
+					;;
+				*)
+					if [ -z "$new_path" ]; then
+						new_path="$entry"
+					else
+						new_path="${new_path}:${entry}"
+					fi
+					;;
+			esac
+		done
+		if [ -n "$new_path" ]; then
+			PIKE_INCLUDE_PATH="$new_path"
+		else
+			unset PIKE_INCLUDE_PATH
+		fi
+	fi
+
+	# Unset Pike master and pvm-specific variables
+	unset PIKE_MASTER
+	unset PVM_PIKE_HOME
+	unset PVM_PIKE_VERSION
+}
+
+# Set Pike environment variables for a version
+# Detects the correct layout (binary extract vs source install)
+pvm_set_pike_env() {
+	local version="$1"
+	local version_path
+	version_path="$(pvm_version_path "$version")"
+
+	# Detect lib/modules path — check common layouts
+	local modules_path=""
+	if [ -d "${version_path}/build/lib/modules" ]; then
+		modules_path="${version_path}/build/lib/modules"
+	elif [ -d "${version_path}/lib/modules" ]; then
+		modules_path="${version_path}/lib/modules"
+	elif [ -d "${version_path}/build/lib" ]; then
+		modules_path="${version_path}/build/lib"
+	fi
+
+	# Strip any prior pvm-managed entries before prepending
+	pvm_strip_pike_env
+
+	# Set PIKE_MODULE_PATH if modules directory exists
+	if [ -n "$modules_path" ]; then
+		if [ -n "${PIKE_MODULE_PATH:-}" ]; then
+			PIKE_MODULE_PATH="${modules_path}:${PIKE_MODULE_PATH}"
+		else
+			PIKE_MODULE_PATH="$modules_path"
+		fi
+		export PIKE_MODULE_PATH
+	fi
+
+	# Set PIKE_INCLUDE_PATH if include directory exists (binary extract layout)
+	if [ -d "${version_path}/build/include" ]; then
+		local include_path="${version_path}/build/include"
+		if [ -n "${PIKE_INCLUDE_PATH:-}" ]; then
+			PIKE_INCLUDE_PATH="${include_path}:${PIKE_INCLUDE_PATH}"
+		else
+			PIKE_INCLUDE_PATH="$include_path"
+		fi
+		export PIKE_INCLUDE_PATH
+	fi
+
+	# Set PIKE_MASTER if master.pike exists
+	if [ -f "${version_path}/master.pike" ]; then
+		PIKE_MASTER="${version_path}/master.pike"
+		export PIKE_MASTER
+	fi
+
+	# Set pvm integration variables
+	PVM_PIKE_HOME="${version_path}/build"
+	export PVM_PIKE_HOME
+	PVM_PIKE_VERSION="${version}"
+	export PVM_PIKE_VERSION
+}
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -1195,6 +1314,7 @@ pvm_command_deactivate() {
 		return 1
 	fi
 
+	pvm_strip_pike_env
 	pvm_strip_path
 	unset PVM_BIN
 	unset PVM_PIKE

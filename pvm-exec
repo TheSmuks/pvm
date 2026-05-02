@@ -17,7 +17,8 @@ fi
 VERSION="$1"
 shift
 
-BIN_PATH="${PVM_DIR}/versions/${VERSION}/bin"
+VERSION_PATH="${PVM_DIR}/versions/${VERSION}"
+BIN_PATH="${VERSION_PATH}/bin"
 
 if [ ! -x "${BIN_PATH}/pike" ]; then
 	echo "pvm-exec: Pike ${VERSION} is not installed" >&2
@@ -25,4 +26,23 @@ if [ ! -x "${BIN_PATH}/pike" ]; then
 fi
 
 export PATH="${BIN_PATH}:${PATH}"
+
+# Export Pike environment variables
+MODULES_PATH="${VERSION_PATH}/build/lib/modules"
+if [ -d "$MODULES_PATH" ]; then
+	export PIKE_MODULE_PATH="${MODULES_PATH}${PIKE_MODULE_PATH:+:${PIKE_MODULE_PATH}}"
+fi
+
+INCLUDE_PATH="${VERSION_PATH}/build/include"
+if [ -d "$INCLUDE_PATH" ]; then
+	export PIKE_INCLUDE_PATH="${INCLUDE_PATH}${PIKE_INCLUDE_PATH:+:${PIKE_INCLUDE_PATH}}"
+fi
+
+if [ -f "${VERSION_PATH}/master.pike" ]; then
+	export PIKE_MASTER="${VERSION_PATH}/master.pike"
+fi
+
+export PVM_PIKE_HOME="${VERSION_PATH}/build"
+export PVM_PIKE_VERSION="${VERSION}"
+
 exec "$@"

@@ -11,7 +11,7 @@ _pvm_completions() {
 
 	# First command completion
 	if [ "$COMP_CWORD" -eq 1 ]; then
-		COMPREPLY=($(compgen -W "$commands" -- "$cur"))
+		mapfile -t COMPREPLY < <(compgen -W "$commands" -- "$cur")
 		return 0
 	fi
 
@@ -23,9 +23,9 @@ _pvm_completions() {
 				# Suggest --source, --binary, --latest, or versions
 				local installed=""
 				if [ -d "${PVM_DIR:-$HOME/.pvm}/versions" ]; then
-					installed="$(ls "${PVM_DIR:-$HOME/.pvm}/versions/" 2>/dev/null | tr '\n' ' ')"
+					installed="$(find "${PVM_DIR:-$HOME/.pvm}/versions/" -maxdepth 1 -mindepth 1 -printf '%f ' 2>/dev/null)"
 				fi
-				COMPREPLY=($(compgen -W "--source --binary --latest $installed" -- "$cur"))
+				mapfile -t COMPREPLY < <(compgen -W "--source --binary --latest $installed" -- "$cur")
 			fi
 			;;
 		use|uninstall|run|exec|which)
@@ -33,13 +33,13 @@ _pvm_completions() {
 				# Complete with installed versions
 				if [ -d "${PVM_DIR:-$HOME/.pvm}/versions" ]; then
 					local versions
-					versions="$(ls "${PVM_DIR:-$HOME/.pvm}/versions/" 2>/dev/null | tr '\n' ' ')"
+					versions="$(find "${PVM_DIR:-$HOME/.pvm}/versions/" -maxdepth 1 -mindepth 1 -printf '%f ' 2>/dev/null)"
 					# Also add aliases
 					local aliases=""
 					if [ -d "${PVM_DIR:-$HOME/.pvm}/alias" ]; then
-						aliases="$(ls "${PVM_DIR:-$HOME/.pvm}/alias/" 2>/dev/null | tr '\n' ' ')"
+						aliases="$(find "${PVM_DIR:-$HOME/.pvm}/alias/" -maxdepth 1 -mindepth 1 -printf '%f ' 2>/dev/null)"
 					fi
-					COMPREPLY=($(compgen -W "$versions $aliases" -- "$cur"))
+					mapfile -t COMPREPLY < <(compgen -W "$versions $aliases" -- "$cur")
 				fi
 			fi
 			;;
@@ -48,15 +48,15 @@ _pvm_completions() {
 				# Complete with alias names
 				if [ -d "${PVM_DIR:-$HOME/.pvm}/alias" ]; then
 					local aliases
-					aliases="$(ls "${PVM_DIR:-$HOME/.pvm}/alias/" 2>/dev/null | tr '\n' ' ')"
-					COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
+					aliases="$(find "${PVM_DIR:-$HOME/.pvm}/alias/" -maxdepth 1 -mindepth 1 -printf '%f ' 2>/dev/null)"
+					mapfile -t COMPREPLY < <(compgen -W "$aliases" -- "$cur")
 				fi
 			elif [ "$COMP_CWORD" -eq 3 ]; then
 				# Complete version for alias set
 				if [ -d "${PVM_DIR:-$HOME/.pvm}/versions" ]; then
 					local versions
-					versions="$(ls "${PVM_DIR:-$HOME/.pvm}/versions/" 2>/dev/null | tr '\n' ' ')"
-					COMPREPLY=($(compgen -W "$versions" -- "$cur"))
+					versions="$(find "${PVM_DIR:-$HOME/.pvm}/versions/" -maxdepth 1 -mindepth 1 -printf '%f ' 2>/dev/null)"
+					mapfile -t COMPREPLY < <(compgen -W "$versions" -- "$cur")
 				fi
 			fi
 			;;
@@ -64,8 +64,8 @@ _pvm_completions() {
 			if [ "$prev" = "$command" ]; then
 				if [ -d "${PVM_DIR:-$HOME/.pvm}/alias" ]; then
 					local aliases
-					aliases="$(ls "${PVM_DIR:-$HOME/.pvm}/alias/" 2>/dev/null | tr '\n' ' ')"
-					COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
+					aliases="$(find "${PVM_DIR:-$HOME/.pvm}/alias/" -maxdepth 1 -mindepth 1 -printf '%f ' 2>/dev/null)"
+					mapfile -t COMPREPLY < <(compgen -W "$aliases" -- "$cur")
 				fi
 			fi
 			;;
@@ -74,7 +74,7 @@ _pvm_completions() {
 			;;
 		cache)
 			if [ "$prev" = "cache" ]; then
-				COMPREPLY=($(compgen -W "dir clear" -- "$cur"))
+				mapfile -t COMPREPLY < <(compgen -W "dir clear" -- "$cur")
 			fi
 			;;
 	esac

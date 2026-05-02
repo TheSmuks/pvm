@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed all 36 pre-existing shellcheck findings (warnings + info) across the project
 ### Added
 
 - Initial implementation of pvm (Pike Version Manager)
@@ -31,3 +32,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bash tab completion
 - Bootstrap installer (`install.sh`)
 - POSIX shell script architecture (sourced, not executed)
+
+- Pike environment transparency: `pvm use` now exports `PIKE_MODULE_PATH`, `PIKE_INCLUDE_PATH`, `PIKE_MASTER`, `PVM_PIKE_HOME`, `PVM_PIKE_VERSION` for Pike module resolution and pmp integration

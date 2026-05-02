@@ -26,7 +26,8 @@ fail() {
 run_test() { TESTS_RUN=$((TESTS_RUN + 1)); }
 
 # Setup: create a temporary PVM_DIR for testing
-export PVM_DIR="$(mktemp -d)"
+PVM_DIR="$(mktemp -d)"
+export PVM_DIR
 mkdir -p "${PVM_DIR}/versions"
 mkdir -p "${PVM_DIR}/alias"
 mkdir -p "${PVM_DIR}/.cache/bin"
@@ -49,11 +50,11 @@ cleanup() {
 trap cleanup EXIT
 
 # Run individual test files
-printf "${YELLOW}Running pvm tests...${RESET}\n\n"
+printf '%b' "${YELLOW}Running pvm tests...${RESET}\n\n"
 
 for test_file in "${SCRIPT_DIR}"/test_*.sh; do
 	[ -f "$test_file" ] || continue
-	printf "${YELLOW}--- %s ---${RESET}\n" "$(basename "$test_file")"
+	printf '%b' "${YELLOW}--- %s ---${RESET}\n" "$(basename "$test_file")"
 	# shellcheck source=/dev/null
 	. "$test_file"
 	printf "\n"
@@ -62,11 +63,11 @@ done
 set +euo pipefail
 
 # Summary
-printf "\n${YELLOW}======================${RESET}\n"
+printf "\n%b======================%b\n" "${YELLOW}" "${RESET}"
 printf "Tests run:    %d\n" "$TESTS_RUN"
-printf "${GREEN}Passed:       %d${RESET}\n" "$TESTS_PASSED"
+printf '%b' "${GREEN}Passed:       %d${RESET}\n" "$TESTS_PASSED"
 if [ "$TESTS_FAILED" -gt 0 ]; then
-	printf "${RED}Failed:       %d${RESET}\n" "$TESTS_FAILED"
+	printf '%b' "${RED}Failed:       %d${RESET}\n" "$TESTS_FAILED"
 	printf "\nFailures:\n"
 	printf '%b\n' "$FAILURES"
 	exit 1
@@ -74,4 +75,4 @@ else
 	printf "Failed:       0\n"
 fi
 
-printf "\n${GREEN}All tests passed!${RESET}\n"
+printf '\n%bAll tests passed!%b\n' "${GREEN}" "${RESET}"

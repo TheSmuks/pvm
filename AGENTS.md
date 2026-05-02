@@ -102,7 +102,11 @@ When an AI agent is working in this repository:
 5. **One concern per change.** A PR should address one issue or feature.
 6. **Update CHANGELOG.md** for every user-facing change.
 7. **Follow the sourced-script pattern.** Do not add `#!/usr/bin/env bash` to pvm.sh.
+
+
 8. **Clean up after yourself.** Remove dead code and unused variables.
+
+9. **Zero lint tolerance.** All shellcheck findings (info, warning, error) must be zero before requesting review. Do not leave pre-existing warnings unfixed. If a finding is a false positive, suppress it with a `# shellcheck disable=SCXXXX` comment and explain why.
 
 ## Conventions
 
