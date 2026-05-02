@@ -638,7 +638,6 @@ pvm_install_binary() {
 	# Find matching binary
 	slug="$(pvm_find_binary_slug "$version")" || {
 		pvm_err "no binary found for ${os}-${arch} for Pike ${version}"
-		pvm_err "Try 'pvm install ${version} --source' to build from source."
 		return 1
 	}
 
@@ -844,7 +843,25 @@ pvm_command_install() {
 	if [ "$force_source" -eq 1 ]; then
 		pvm_install_source "$version"
 	else
-		pvm_install_binary "$version"
+		if ! pvm_install_binary "$version"; then
+			local os arch
+			os="$(pvm_get_os)"
+			arch="$(pvm_get_arch)"
+			if [ -t 0 ]; then
+				pvm_err "No prebuilt binary available for ${os}-${arch}."
+				printf "pvm: Build Pike %s from source? [Y/n] " "$version" >&2
+				read -r answer
+				case "$answer" in
+					[nN]*)
+						pvm_err "Aborting. Use 'pvm install ${version} --source' to build from source later."
+						return 1
+						;;
+				esac
+			else
+				pvm_info "No binary found. Falling back to source build..."
+			fi
+			pvm_install_source "$version"
+		fi
 	fi
 }
 
