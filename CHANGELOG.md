@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-05-06
+## [0.2.1] - 2026-05-06
+
+### Fixed
+
+- `pvm ls` now shows `(current)` and `(default)` markers for installed versions
+- `pvm ls <pattern>` correctly matches partial version strings (e.g., `1732` matches `8.0.1732`)
+
+### Changed
+
+- `pvm ls-remote <pattern>` pattern matching consistency with `pvm ls`
+
 
 ### Added
 

@@ -1082,6 +1082,13 @@ pvm_command_current() {
 		return 1
 	fi
 }
+pvm_ls_current() {
+	local current=""
+	if [ -n "${PVM_BIN:-}" ] && [ -d "${PVM_BIN}" ]; then
+		current="$(printf '%s' "$PVM_BIN" | sed "s|${PVM_DIR}/versions/||" | cut -d/ -f1)"
+	fi
+	printf '%s' "$current"
+}
 
 pvm_command_ls() {
 	local pattern="${1:-}"
@@ -1100,9 +1107,27 @@ pvm_command_ls() {
 		# Apply pattern filter
 		if [ -n "$pattern" ]; then
 			case "$version" in
-				$pattern) ;;  # Match
+				*"$pattern"*) ;;  # Match
 				*) continue ;;  # Skip
 			esac
+		fi
+
+		# Check if this is the current version
+		local current_ver
+		current_ver="$(pvm_ls_current)" || current_ver=""
+		if [ "$version" = "$current_ver" ]; then
+			printf '%s (current)\n' "$version"
+			found=1
+			continue
+		fi
+
+		# Check if this is the default version
+		local default_ver
+		default_ver="$(pvm_get_alias "default")" || default_ver=""
+		if [ -n "$default_ver" ] && [ "$version" = "$default_ver" ]; then
+			printf '%s (default)\n' "$version"
+			found=1
+			continue
 		fi
 
 		printf '%s\n' "$version"
@@ -1137,7 +1162,7 @@ pvm_command_ls_remote() {
 		# Apply pattern filter
 		if [ -n "$pattern" ]; then
 			case "$ver" in
-				$pattern) ;;  # Match
+				*"$pattern"*) ;;  # Match
 				*) continue ;;  # Skip
 			esac
 		fi
