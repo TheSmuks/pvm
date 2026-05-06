@@ -126,7 +126,17 @@ chmod +x "${PVM_DIR}/pvm-exec" 2>/dev/null || true
 
 info ""
 info "pvm installed! Restart your shell or run:"
-info "  source ${PVM_DIR}/pvm.sh"
+
+# Detect current shell for correct source instruction
+case "$(basename "${SHELL:-bash}")" in
+    fish)
+        info "  source ${PVM_DIR}/pvm.fish"
+        ;;
+    *)
+        info "  source ${PVM_DIR}/pvm.sh"
+        ;;
+esac
+
 info ""
 info "Then install Pike:"
 info "  pvm install --latest"
