@@ -7,9 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Fixed all 36 pre-existing shellcheck findings (warnings + info) across the project
+## [0.2.0] - 2026-05-06
 
 ### Added
 
@@ -19,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `install.sh` detects Fish shell and writes to `~/.config/fish/config.fish`
 
 ## [0.1.0] - 2026-05-03
+
+### Fixed
+
+- Fixed all 36 pre-existing shellcheck findings (warnings + info) across the project
 
 ### Added
 
