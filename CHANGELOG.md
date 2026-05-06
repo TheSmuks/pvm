@@ -8,7 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+
 - Fixed all 36 pre-existing shellcheck findings (warnings + info) across the project
+
+### Added
+
+- Fish shell support via `pvm.fish` (delegates state-mutating commands to bash subshell, handles `use` and `deactivate` natively)
+- `pvm _fish use <version>` — outputs key=value pairs for Fish to consume
+- `pvm _fish deactivate` — outputs variables to unset
+- `install.sh` detects Fish shell and writes to `~/.config/fish/config.fish`
+
+## [0.1.0] - 2026-05-03
+
 ### Added
 
 - Initial implementation of pvm (Pike Version Manager)
@@ -33,5 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bash tab completion
 - Bootstrap installer (`install.sh`)
 - POSIX shell script architecture (sourced, not executed)
+
+### Changed
 
 - Pike environment transparency: `pvm use` now exports `PIKE_MODULE_PATH`, `PIKE_INCLUDE_PATH`, `PIKE_MASTER`, `PVM_PIKE_HOME`, `PVM_PIKE_VERSION` for Pike module resolution and pmp integration
