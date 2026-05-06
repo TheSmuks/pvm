@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed 4 shellcheck warnings in `pvm.sh` (SC2155, SC2164, SC2115)
+- `pvm.sh` now prints a clear error when sourced in Fish shell instead of crashing with a syntax error
+- `install.sh` shows the correct source command for Fish shell users
+
 ## [0.2.1] - 2026-05-06
 
 ### Fixed

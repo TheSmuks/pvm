@@ -10,7 +10,11 @@ if [ -n "${_PVM_LOADED:-}" ]; then
 	return 0 2>/dev/null
 fi
 _PVM_LOADED=1
-
+if [ -n "${FISH_VERSION:-}" ]; then
+    echo "pvm: pvm.sh is not compatible with Fish shell. Source pvm.fish instead:" >&2
+    echo "  source ${PVM_DIR:-\$HOME/.pvm}/pvm.fish" >&2
+    return 1 2>/dev/null || exit 1
+fi
 # Resolve PVM_DIR
 if [ -z "${PVM_DIR:-}" ]; then
 	PVM_DIR="$HOME/.pvm"
