@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed 4 shellcheck warnings in `pvm.sh` (SC2155, SC2164, SC2115)
 ## [0.2.1] - 2026-05-06
 
 ### Fixed

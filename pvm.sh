@@ -614,8 +614,10 @@ pvm_install_source() {
 
 	pvm_info "Installing Pike ${version} from source (this may take a while)..."
 
-	local source_dir="$(pvm_cache_dir)/source/pike-${version}"
-	local version_dir="$(pvm_version_path "$version")"
+	local source_dir
+	source_dir="$(pvm_cache_dir)/source/pike-${version}"
+	local version_dir
+	version_dir="$(pvm_version_path "$version")"
 
 	# Check for git
 	if ! pvm_has git; then
@@ -642,7 +644,7 @@ pvm_install_source() {
 
 	# Build Pike
 	pvm_info "Building Pike..."
-	cd "$source_dir"
+	cd "$source_dir" || return
 
 	# Configure
 	./configure --prefix="$version_dir" || {
@@ -1393,7 +1395,7 @@ pvm_command_cache() {
 			local cache_dir
 			cache_dir="$(pvm_cache_dir)"
 			if [ -d "$cache_dir" ]; then
-				rm -rf "$cache_dir"/*
+				rm -rf "${cache_dir:?}"/*
 				pvm_info "Cache cleared"
 			fi
 			;;
