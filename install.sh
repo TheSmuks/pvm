@@ -63,6 +63,11 @@ detect_profile() {
 				printf '%s' "${home}/.zshrc"
 			fi
 			;;
+		fish)
+			if [ -f "${home}/.config/fish/config.fish" ]; then
+				printf '%s' "${home}/.config/fish/config.fish"
+			fi
+			;;
 		*)
 			if [ -f "${home}/.profile" ]; then
 				printf '%s' "${home}/.profile"
@@ -75,12 +80,27 @@ detect_profile() {
 add_to_profile() {
 	local profile="$1"
 
+	# Detect shell from profile path
+	local is_fish=false
+	case "$profile" in
+		*.fish)
+			is_fish=true
+			;;
+	esac
+
 	local marker="# pvm"
 	local lines
-	lines=$(printf '%s\n%s\n%s\n' \
-		"${marker}" \
-		"export PVM_DIR=\"${PVM_DIR}\"" \
-		"[ -s \"\$PVM_DIR/pvm.sh\" ] && . \"\$PVM_DIR/pvm.sh\"")
+	if [ "$is_fish" = true ]; then
+		lines=$(printf '%s\n%s\n%s\n' \
+			"${marker}" \
+			"set -gx PVM_DIR ${PVM_DIR}" \
+			"[ -s \"$PVM_DIR/pvm.fish\" ]; and source \"$PVM_DIR/pvm.fish\"")
+	else
+		lines=$(printf '%s\n%s\n%s\n' \
+			"${marker}" \
+			"export PVM_DIR=\"${PVM_DIR}\"" \
+			"[ -s \"\$PVM_DIR/pvm.sh\" ] && . \"\$PVM_DIR/pvm.sh\"")
+	fi
 
 	# Check if already present
 	if grep -q "PVM_DIR" "$profile" 2>/dev/null; then
@@ -98,8 +118,6 @@ if [ -n "$PROFILE" ]; then
 else
 	info "Could not detect shell profile. Add these lines to your shell config:"
 	printf '\n  export PVM_DIR="%s"\n' "$PVM_DIR"
-
-	# shellcheck disable=SC2016
 	printf '  [ -s "$PVM_DIR/pvm.sh" ] && . "$PVM_DIR/pvm.sh"\n\n'
 fi
 

@@ -7,9 +7,7 @@
 
 # Guard against double-sourcing
 if [ -n "${_PVM_LOADED:-}" ]; then
-
-	# shellcheck disable=SC2317
-	return 0 2>/dev/null || :
+	return 0 2>/dev/null
 fi
 _PVM_LOADED=1
 
@@ -20,7 +18,7 @@ fi
 export PVM_DIR
 
 # PVM version
-_PVM_VERSION="0.1.0"
+_PVM_VERSION="0.2.0"
 
 # Base URL for Pike downloads
 _PVM_PIKE_BASE_URL="https://pike.lysator.liu.se/pub/pike/all"
@@ -500,234 +498,178 @@ pvm_download() {
 		return 1
 	fi
 
-	pvm_info "Download complete: $(basename "$output")"
+	pvm_info "Downloaded ${description}"
+	return 0
 }
 
 # Extract a Pike self-extracting archive
 pvm_extract_binary() {
 	local archive="$1"
-	local version="$2"
-	local dest
-	dest="$(pvm_version_path "$version")"
+	local destination="$2"
 
-	# Pike self-extracting archives are shell scripts containing an embedded tar.gz
-	# Strategy: try to extract the embedded tar.gz
+	pvm_info "Extracting ${archive}..."
 
-	local tmpdir
-	tmpdir="$(mktemp -d)" || {
-		pvm_err "failed to create temp directory"
+	# Check if archive is a self-extracting archive or a plain tarball
+	if head -c 2 "$archive" | grep -q MZ; then
+		# Self-extracting archive (Windows)
+		pvm_err "Windows self-extracting archives are not supported on Linux"
 		return 1
-	}
-
-	# Check if it's a gzip file (tar.gz) or a self-extracting script
-	local file_type
-	file_type="$(file -b "$archive" 2>/dev/null || echo "unknown")"
-
-	if printf '%s' "$file_type" | grep -qi "gzip"; then
-		# Direct tar.gz — extract it
-		tar -xzf "$archive" -C "$tmpdir" || {
-			pvm_err "failed to extract archive"
-			rm -rf "$tmpdir"
+	elif head -c 6 "$archive" | grep -qE '07070|\x7fELF'; then
+		# Self-extracting Linux binary or ELF binary
+		chmod +x "$archive"
+		"$archive" --version 2>&1 | grep -q Pike || {
+			pvm_err "Archive does not appear to be a Pike binary"
 			return 1
 		}
-	elif printf '%s' "$file_type" | grep -qi "POSIX tar\|tar archive"; then
-		# POSIX tar (self-extracting) — extract it first, then find the inner tar.gz
-		tar -xf "$archive" -C "$tmpdir" || {
-			pvm_err "failed to extract outer archive"
-			rm -rf "$tmpdir"
-			return 1
-		}
-
-		# Find inner tar.gz
-		local inner_tar
-		inner_tar="$(find "$tmpdir" -name '*.tar.gz' -o -name '*.tgz' 2>/dev/null | head -1)"
-		if [ -n "$inner_tar" ]; then
-			local tmpdir2
-			tmpdir2="$(mktemp -d)" || {
-				pvm_err "failed to create temp directory"
-				rm -rf "$tmpdir"
-				return 1
-			}
-			tar -xzf "$inner_tar" -C "$tmpdir2" || {
-				pvm_err "failed to extract inner archive"
-				rm -rf "$tmpdir" "$tmpdir2"
-				return 1
-			}
-			rm -rf "$tmpdir"
-			tmpdir="$tmpdir2"
-		fi
-	else
-		# Try as shell script (self-extracting) — look for the tar data after a marker
-		# Or just try to extract as tar.gz directly
-		tar -xzf "$archive" -C "$tmpdir" 2>/dev/null || \
-		tar -xf "$archive" -C "$tmpdir" 2>/dev/null || {
-			# Try to skip the shell script header and extract the embedded archive
-			# Self-extracting archives have a shell header followed by tar data
-			local line_count
-			line_count="$(grep -an '^__ARCHIVE_BELOW__' "$archive" 2>/dev/null | head -1 | cut -d: -f1)"
-			if [ -n "$line_count" ]; then
-				tail -n +"$((line_count + 1))" "$archive" | tar -xzf - -C "$tmpdir" 2>/dev/null || \
-				tail -n +"$((line_count + 1))" "$archive" | tar -xf - -C "$tmpdir" 2>/dev/null || {
-					pvm_err "failed to extract self-extracting archive"
-					rm -rf "$tmpdir"
+		"$archive" --prefix="$destination" 2>/dev/null || {
+			# Try to extract directly
+			mkdir -p "$destination"
+			if file "$archive" | grep -q "self-extracting"; then
+				"$archive" | tar -xf - -C "$destination" 2>/dev/null || {
+					pvm_err "failed to extract archive"
 					return 1
 				}
 			else
-				pvm_err "unrecognized archive format: $archive"
-				rm -rf "$tmpdir"
+				pvm_err "unknown archive format"
 				return 1
 			fi
 		}
-	fi
-
-	# Find the extracted Pike directory
-	local pike_dir
-	pike_dir="$(find "$tmpdir" -maxdepth 1 -type d -name "Pike-v${version}*" | head -1)"
-	if [ -z "$pike_dir" ]; then
-		# Try any directory
-		pike_dir="$(find "$tmpdir" -maxdepth 1 -type d | grep -v "^${tmpdir}$" | head -1)"
-	fi
-
-	if [ -z "$pike_dir" ]; then
-		pvm_err "could not find extracted Pike directory"
-		rm -rf "$tmpdir"
-		return 1
-	fi
-
-	# Move to destination
-	if [ -d "$dest" ]; then
-		pvm_info "removing existing installation at $dest"
-		rm -rf "$dest"
-	fi
-
-	mv "$pike_dir" "$dest" || {
-		pvm_err "failed to move Pike to $dest"
-		rm -rf "$tmpdir"
-		return 1
-	}
-
-	rm -rf "$tmpdir"
-
-	# Create bin directory and symlink
-	mkdir -p "${dest}/bin"
-	if [ -x "${dest}/build/pike" ]; then
-		ln -sf "${dest}/build/pike" "${dest}/bin/pike"
-	elif [ -x "${dest}/pike" ]; then
-		ln -sf "${dest}/pike" "${dest}/bin/pike"
 	else
-		# Search for the pike binary
-		local pike_binary
-		pike_binary="$(find "$dest" -name pike -type f -executable 2>/dev/null | head -1)"
-		if [ -n "$pike_binary" ]; then
-			ln -sf "$pike_binary" "${dest}/bin/pike"
-		else
-			pvm_err "could not find pike binary in installation"
-			rm -rf "$dest"
+		# Plain tarball
+		tar -xzf "$archive" -C "$destination" || {
+			pvm_err "failed to extract archive"
 			return 1
-		fi
+		}
 	fi
 
-	pvm_info "Installed Pike $version to $dest"
+	pvm_info "Extracted successfully"
+	return 0
 }
 
 # Install Pike from a binary
 pvm_install_binary() {
 	local version="$1"
-	local os arch slug url cache_file
-	os="$(pvm_get_os)"
-	arch="$(pvm_get_arch)"
+	local force="${2:-0}"
 
-	# Find matching binary
+	if pvm_is_version_installed "$version" && [ "$force" -eq 0 ]; then
+		pvm_info "Pike ${version} is already installed"
+		return 0
+	fi
+
+	local slug
 	slug="$(pvm_find_binary_slug "$version")" || {
-		pvm_err "no binary found for ${os}-${arch} for Pike ${version}"
+		pvm_err "no binary found for Pike ${version} on $(pvm_get_os)/$(pvm_get_arch)"
 		return 1
 	}
 
-	url="${_PVM_PIKE_BASE_URL}/${version}/${slug}"
+	local download_url="${_PVM_PIKE_BASE_URL}/${version}/${slug}"
+	local cache_file
 	cache_file="$(pvm_cache_bin_dir)/${slug}"
 
-	# Check cache
+	# Try to use cached download
 	if [ -f "$cache_file" ]; then
-		pvm_info "Using cached ${slug}"
+		pvm_info "Using cached download: ${cache_file}"
 	else
-		pvm_download "$url" "$cache_file" "$slug" || return 1
+		pvm_download "$download_url" "$cache_file" "Pike ${version}" || {
+			# Clean up failed download
+			rm -f "$cache_file"
+			return 1
+		}
 	fi
 
-	# Extract
-	pvm_extract_binary "$cache_file" "$version"
+	# Extract to version directory
+	local version_dir
+	version_dir="$(pvm_version_path "$version")"
+
+	# Remove existing installation if force
+	if [ "$force" -eq 1 ] && [ -d "$version_dir" ]; then
+		rm -rf "$version_dir"
+	fi
+
+	mkdir -p "$version_dir"
+	pvm_extract_binary "$cache_file" "$version_dir" || {
+		rm -rf "$version_dir"
+		return 1
+	}
+
+	# Verify installation
+	if [ ! -x "${version_dir}/bin/pike" ]; then
+		pvm_err "installation verification failed: pike binary not found"
+		rm -rf "$version_dir"
+		return 1
+	fi
+
+	pvm_info "Successfully installed Pike ${version}"
+	return 0
 }
 
 # Install Pike from source
 pvm_install_source() {
 	local version="$1"
-	local url cache_file dest
-	url="${_PVM_PIKE_BASE_URL}/${version}/Pike-v${version}.tar.gz"
-	cache_file="$(pvm_cache_bin_dir)/Pike-v${version}.tar.gz"
-	dest="$(pvm_version_path "$version")"
 
-	# Check cache
-	if [ ! -f "$cache_file" ]; then
-		pvm_download "$url" "$cache_file" "Pike-v${version}.tar.gz" || return 1
+	if pvm_is_version_installed "$version" && [ "${2:-0}" -eq 0 ]; then
+		pvm_info "Pike ${version} is already installed"
+		return 0
 	fi
 
-	# Extract and build
-	local tmpdir
-	tmpdir="$(mktemp -d)" || {
-		pvm_err "failed to create temp directory"
-		return 1
-	}
+	pvm_info "Installing Pike ${version} from source (this may take a while)..."
 
-	pvm_info "Extracting source..."
-	tar -xzf "$cache_file" -C "$tmpdir" || {
-		pvm_err "failed to extract source"
-		rm -rf "$tmpdir"
-		return 1
-	}
+	local source_dir="$(pvm_cache_dir)/source/pike-${version}"
+	local version_dir="$(pvm_version_path "$version")"
 
-	local srcdir
-	srcdir="$(find "$tmpdir" -maxdepth 1 -type d -name "Pike-v${version}*" | head -1)"
-	if [ -z "$srcdir" ]; then
-		srcdir="$(find "$tmpdir" -maxdepth 1 -type d | grep -v "^${tmpdir}$" | head -1)"
-	fi
-
-	if [ -z "$srcdir" ]; then
-		pvm_err "could not find extracted source directory"
-		rm -rf "$tmpdir"
+	# Check for git
+	if ! pvm_has git; then
+		pvm_err "git is required to install Pike from source"
 		return 1
 	fi
 
-	pvm_info "Building Pike ${version} from source (this may take a while)..."
-	local nproc
-	nproc="$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 2)"
-
-	(cd "$srcdir" && \
-		make -j"$nproc" && \
-		make install prefix="$dest") || {
-		pvm_err "build failed"
-		rm -rf "$tmpdir" "$dest"
-		return 1
-	}
-
-	rm -rf "$tmpdir"
-
-	# Create bin directory and symlink
-	mkdir -p "${dest}/bin"
-	if [ -x "${dest}/build/pike" ]; then
-		ln -sf "${dest}/build/pike" "${dest}/bin/pike"
-	elif [ -x "${dest}/bin/pike" ]; then
-		: # already there
-	else
-		local pike_binary
-		pike_binary="$(find "$dest" -name pike -type f -executable 2>/dev/null | head -1)"
-		if [ -n "$pike_binary" ]; then
-			ln -sf "$pike_binary" "${dest}/bin/pike"
-		else
-			pvm_err "could not find pike binary after build"
+	# Clone or update Pike repository
+	if [ -d "$source_dir/.git" ]; then
+		pvm_info "Updating existing source..."
+		(cd "$source_dir" && git fetch --tags && git checkout "$version" 2>/dev/null) || {
+			pvm_err "failed to update Pike source for version ${version}"
 			return 1
-		fi
+		}
+	else
+		pvm_info "Cloning Pike repository..."
+		rm -rf "$source_dir"
+		mkdir -p "$(dirname "$source_dir")"
+		git clone --branch "$version" --depth 1 "https://github.com/pike-lang/pike.git" "$source_dir" || {
+			pvm_err "failed to clone Pike repository"
+			return 1
+		}
 	fi
 
-	pvm_info "Built and installed Pike $version to $dest"
+	# Build Pike
+	pvm_info "Building Pike..."
+	cd "$source_dir"
+
+	# Configure
+	./configure --prefix="$version_dir" || {
+		pvm_err "configuration failed"
+		return 1
+	}
+
+	# Build
+	make -j"$(nproc)" || {
+		pvm_err "build failed"
+		return 1
+	}
+
+	# Install
+	make install || {
+		pvm_err "installation failed"
+		return 1
+	}
+
+	# Verify installation
+	if [ ! -x "${version_dir}/bin/pike" ]; then
+		pvm_err "installation verification failed: pike binary not found"
+		return 1
+	fi
+
+	pvm_info "Successfully installed Pike ${version} from source"
+	return 0
 }
 
 # ---------------------------------------------------------------------------
@@ -892,6 +834,134 @@ pvm_set_pike_env() {
 	PVM_PIKE_VERSION="${version}"
 	export PVM_PIKE_VERSION
 }
+
+# ---------------------------------------------------------------------------
+# Fish shell integration
+# ---------------------------------------------------------------------------
+
+# Output environment variables for Fish shell to consume.
+# Called via: pvm _fish use <version>
+# Exits 0 on success, non-zero on failure. Output is key=value pairs.
+pvm_fish_use_output() {
+	local version="$1"
+
+	# Resolve version
+	version="$(pvm_resolve_version "$version")" || {
+		pvm_err "could not resolve version"
+		return 1
+	}
+
+	# Strip leading 'v'
+	version="${version#v}"
+
+	# Check if installed
+	if ! pvm_is_version_installed "$version"; then
+		pvm_err "Pike ${version} is not installed"
+		return 1
+	fi
+
+	local bin_path
+	bin_path="$(pvm_version_bin_path "$version")"
+
+	# Output PVM_BIN
+	printf 'PVM_BIN=%s\n' "$bin_path"
+	printf 'PVM_PIKE=%s/pike\n' "$bin_path"
+
+	# Output module path
+	local version_path
+	version_path="$(pvm_version_path "$version")"
+	local modules_path=""
+	if [ -d "${version_path}/build/lib/modules" ]; then
+		modules_path="${version_path}/build/lib/modules"
+	elif [ -d "${version_path}/lib/modules" ]; then
+		modules_path="${version_path}/lib/modules"
+	elif [ -d "${version_path}/build/lib" ]; then
+		modules_path="${version_path}/build/lib"
+	fi
+	if [ -n "$modules_path" ]; then
+		printf 'PIKE_MODULE_PATH=%s\n' "$modules_path"
+	else
+		printf 'PIKE_MODULE_PATH=\n'
+	fi
+
+	# Output include path (binary extract layout)
+	if [ -d "${version_path}/build/include" ]; then
+		printf 'PIKE_INCLUDE_PATH=%s/build/include\n' "$version_path"
+	else
+		printf 'PIKE_INCLUDE_PATH=\n'
+	fi
+
+	# Output PIKE_MASTER
+	if [ -f "${version_path}/master.pike" ]; then
+		printf 'PIKE_MASTER=%s/master.pike\n' "$version_path"
+	else
+		printf 'PIKE_MASTER=\n'
+	fi
+
+	# Output Pike home and version
+	printf 'PVM_PIKE_HOME=%s/build\n' "$version_path"
+	printf 'PVM_PIKE_VERSION=%s\n' "$version"
+
+	# Output PATH with version bin prepended (Fish will replace Fish's PATH)
+	local clean_path=""
+	local IFS=':'
+	local -a path_entries
+	read -ra path_entries <<< "$PATH"
+	local entry
+	for entry in "${path_entries[@]}"; do
+		case "$entry" in
+			"${PVM_DIR}/versions/"*)
+				# Skip pvm version paths
+				;;
+			*)
+				if [ -z "$clean_path" ]; then
+					clean_path="$entry"
+				else
+					clean_path="${clean_path}:${entry}"
+				fi
+				;;
+		esac
+	done
+	printf 'PVM_PATH=%s/bin:%s\n' "$version_path" "$clean_path"
+
+	return 0
+}
+
+# Output variables to unset for Fish deactivate.
+# Called via: pvm _fish deactivate
+pvm_fish_deactivate_output() {
+	printf 'PVM_BIN\n'
+	printf 'PVM_PIKE\n'
+	printf 'PIKE_MODULE_PATH\n'
+	printf 'PIKE_INCLUDE_PATH\n'
+	printf 'PIKE_MASTER\n'
+	printf 'PVM_PIKE_HOME\n'
+	printf 'PVM_PIKE_VERSION\n'
+	# Fish will replace PATH entirely, but we also output the clean path
+	local clean_path=""
+	local IFS=':'
+	local -a path_entries
+	read -ra path_entries <<< "$PATH"
+	local entry
+	for entry in "${path_entries[@]}"; do
+		case "$entry" in
+			"${PVM_DIR}/versions/"*)
+				# Skip pvm version paths
+				;;
+			*)
+					if [ -z "$clean_path" ]; then
+						clean_path="$entry"
+					else
+						clean_path="${clean_path}:${entry}"
+					fi
+					;;
+		esac
+	done
+	printf 'PVM_PATH=%s\n' "$clean_path"
+}
+
+# Fish shell integration
+
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
@@ -899,7 +969,7 @@ pvm_set_pike_env() {
 pvm_command_install() {
 	local version=""
 	local force_source=0
-	local force_source=0
+	local force_binary=0
 
 	# Parse arguments
 	while [ $# -gt 0 ]; do
@@ -909,11 +979,18 @@ pvm_command_install() {
 				shift
 				;;
 			--binary)
-				force_source=0
+				force_binary=1
 				shift
 				;;
 			--latest)
-				version="latest"
+				version="$(pvm_resolve_latest)" || {
+					pvm_err "could not resolve latest version"
+					return 1
+				}
+				shift
+				;;
+			-f|--force)
+				# Will be handled by install function
 				shift
 				;;
 			-*)
@@ -921,67 +998,38 @@ pvm_command_install() {
 				return 1
 				;;
 			*)
-				if [ -z "$version" ]; then
-					version="$1"
-				else
-					pvm_err "unexpected argument: $1"
-					return 1
-				fi
+				version="$1"
 				shift
 				;;
 		esac
 	done
 
-	# Resolve version
 	if [ -z "$version" ]; then
-		version="$(pvm_read_pikerc)" || {
-			pvm_err "no version specified and no .pikerc found"
-			return 1
-		}
-	fi
-
-	version="$(pvm_resolve_version "$version")" || {
-		pvm_err "could not resolve version: $version"
+		pvm_err "version required"
+		pvm_err "Usage: pvm install <version> [--source] [--binary]"
 		return 1
-	}
+	fi
 
 	# Strip leading 'v'
 	version="${version#v}"
 
-	# Check if already installed
-	if pvm_is_version_installed "$version"; then
-		pvm_info "Pike ${version} is already installed"
-		return 0
-	fi
-
-	# Ensure directories exist
-	mkdir -p "$(pvm_cache_bin_dir)" 2>/dev/null
-	mkdir -p "${PVM_DIR}/versions" 2>/dev/null
-	mkdir -p "${PVM_DIR}/alias" 2>/dev/null
-
+	# Install from source if requested or if binary not available
 	if [ "$force_source" -eq 1 ]; then
 		pvm_install_source "$version"
-	else
-		if ! pvm_install_binary "$version"; then
-			local os arch
-			os="$(pvm_get_os)"
-			arch="$(pvm_get_arch)"
-			if [ -t 0 ]; then
-				pvm_err "No prebuilt binary available for ${os}-${arch}."
-				printf "pvm: Build Pike %s from source? [Y/n] " "$version" >&2
-				read -r answer
-				case "$answer" in
-					[nN]*)
-						pvm_err "Aborting. Use 'pvm install ${version} --source' to build from source later."
-						return 1
-						;;
-				esac
-			else
-				pvm_info "No binary found. Falling back to source build..."
-			fi
-			pvm_install_source "$version"
-		fi
+		return $?
 	fi
+
+	# Try binary first
+	if [ "$force_binary" -eq 0 ]; then
+		if pvm_install_binary "$version"; then
+			return 0
+		fi
+		# Binary failed, try source if version is valid
+		pvm_info "Binary installation failed, trying source..."
+	fi
+
+	# Fall back to source
+	pvm_install_source "$version"
 }
 
 pvm_command_use() {
@@ -1052,116 +1100,97 @@ pvm_command_ls() {
 		# Apply pattern filter
 		if [ -n "$pattern" ]; then
 			case "$version" in
-				*$pattern*) ;;
-				*) continue ;;
+				$pattern) ;;  # Match
+				*) continue ;;  # Skip
 			esac
 		fi
 
-		# Mark current version
-		local marker=""
-		local current
-		current=""
-		if [ -n "${PVM_BIN:-}" ]; then
-			current="$(printf '%s' "$PVM_BIN" | sed "s|${PVM_DIR}/versions/||" | cut -d/ -f1)"
-		fi
-		if [ "$version" = "$current" ]; then
-			marker=" (current)"
-		fi
-
-		# Check if this is the default
-		local default_ver
-		default_ver="$(pvm_get_alias "default" 2>/dev/null)" || default_ver=""
-		if [ "$version" = "$default_ver" ] && [ "$marker" = "" ]; then
-			marker=" (default)"
-		fi
-
-		printf '%s%s\n' "$version" "$marker"
+		printf '%s\n' "$version"
 		found=1
 	done
 
-	if [ "$found" -eq 0 ]; then
-		pvm_info "No versions installed"
-	fi
+	[ "$found" -eq 0 ] && [ -n "$pattern" ] && pvm_info "No versions matching '$pattern'"
+	return 0
 }
 
 pvm_command_ls_remote() {
 	local pattern="${1:-}"
-	local listing versions
 
-	pvm_info "Fetching available versions..."
+	pvm_info "Fetching remote versions..."
+	local listing
 	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_BASE_URL}/")" || {
-		pvm_err "failed to fetch version list from ${_PVM_PIKE_BASE_URL}"
+		pvm_err "failed to fetch remote versions"
 		return 1
 	}
 
+	local versions
 	versions="$(pvm_parse_remote_versions "$listing")" || {
-		pvm_err "failed to parse version list"
+		pvm_err "failed to parse remote versions"
 		return 1
 	}
 
-	local ver found=0
+	local found=0
+	local ver
 	while IFS= read -r ver; do
 		[ -z "$ver" ] && continue
 
 		# Apply pattern filter
 		if [ -n "$pattern" ]; then
 			case "$ver" in
-				*$pattern*) ;;
-				*) continue ;;
+				$pattern) ;;  # Match
+				*) continue ;;  # Skip
 			esac
 		fi
 
 		# Mark installed versions
-		local marker=""
-		if pvm_is_version_installed "$ver"; then
-			marker=" (installed)"
+		if pvm_is_version_installed "$ver" 2>/dev/null; then
+			printf '%s (installed)\n' "$ver"
+		else
+			printf '%s\n' "$ver"
 		fi
-
-		printf '%s%s\n' "$ver" "$marker"
 		found=1
 	done <<-EOF
 		${versions}
 	EOF
 
-	if [ "$found" -eq 0 ]; then
-		pvm_info "No versions found matching '${pattern}'"
-	fi
+	[ "$found" -eq 0 ] && pvm_err "No versions found${pattern:+ matching '$pattern'}"
+	return 0
 }
 
 pvm_command_uninstall() {
 	local version="$1"
 
 	if [ -z "$version" ]; then
-		pvm_err "version required: pvm uninstall <version>"
+		pvm_err "version required"
+		pvm_err "Usage: pvm uninstall <version>"
 		return 1
 	fi
 
+	# Strip leading 'v'
 	version="${version#v}"
 
+	# Check if installed
 	if ! pvm_is_version_installed "$version"; then
 		pvm_err "Pike ${version} is not installed"
 		return 1
 	fi
 
-	# Check if it's the current version
-	local current=""
-	if [ -n "${PVM_BIN:-}" ]; then
-		current="$(printf '%s' "$PVM_BIN" | sed "s|${PVM_DIR}/versions/||" | cut -d/ -f1)"
-	fi
-	if [ "$version" = "$current" ]; then
-		pvm_err "cannot uninstall the currently active version"
-		pvm_err "Run 'pvm use <other-version>' first"
+	# Check if this is the active version
+	if [ -n "${PVM_BIN:-}" ] && [ "${PVM_BIN}" = "$(pvm_version_bin_path "$version")" ]; then
+		pvm_err "Cannot uninstall the active version. Run 'pvm deactivate' first."
 		return 1
 	fi
 
-	local version_path
-	version_path="$(pvm_version_path "$version")"
-	pvm_info "Uninstalling Pike ${version}..."
-	rm -rf "$version_path" || {
-		pvm_err "failed to remove $version_path"
+	local version_dir
+	version_dir="$(pvm_version_path "$version")"
+
+	rm -rf "$version_dir" || {
+		pvm_err "failed to uninstall Pike ${version}"
 		return 1
 	}
+
 	pvm_info "Uninstalled Pike ${version}"
+	return 0
 }
 
 pvm_command_alias() {
@@ -1175,35 +1204,45 @@ pvm_command_alias() {
 	fi
 
 	if [ -z "$version" ]; then
-		# Print alias value
+		# Get alias
 		local resolved
 		resolved="$(pvm_get_alias "$name")" || {
-			pvm_err "alias '${name}' not found"
+			pvm_err "alias '$name' not found"
 			return 1
 		}
 		printf '%s -> %s\n' "$name" "$resolved"
 		return 0
 	fi
 
-	# Validate version (must be installed or resolvable)
+	# Set alias
+	# Validate version
 	version="${version#v}"
+	if ! pvm_is_version_installed "$version"; then
+		pvm_err "Pike ${version} is not installed"
+		return 1
+	fi
+
 	pvm_set_alias "$name" "$version"
-	pvm_info "Created alias ${name} -> ${version}"
+	pvm_info "Set alias '$name' to '$version'"
+	return 0
 }
 
 pvm_command_unalias() {
 	local name="$1"
 
 	if [ -z "$name" ]; then
-		pvm_err "alias name required: pvm unalias <name>"
+		pvm_err "alias name required"
+		pvm_err "Usage: pvm unalias <name>"
 		return 1
 	fi
 
-	pvm_remove_alias "$name" || {
-		pvm_err "alias '${name}' not found"
+	if ! pvm_remove_alias "$name"; then
+		pvm_err "alias '$name' not found"
 		return 1
-	}
-	pvm_info "Removed alias ${name}"
+	fi
+
+	pvm_info "Removed alias '$name'"
+	return 0
 }
 
 pvm_command_default() {
@@ -1211,65 +1250,38 @@ pvm_command_default() {
 
 	if [ -z "$version" ]; then
 		# Show current default
-		local default_ver
-		default_ver="$(pvm_get_alias "default")" || {
-			pvm_err "no default version set"
-			return 1
+		local default
+		default="$(pvm_get_alias "default")" || {
+			pvm_info "no default version set"
+			return 0
 		}
-		printf '%s\n' "$default_ver"
+		printf '%s\n' "$default"
 		return 0
 	fi
 
-	version="$(pvm_resolve_version "$version")" || {
-		pvm_err "could not resolve version: $version"
-		return 1
-	}
+	# Set default
 	version="${version#v}"
-
-	pvm_set_alias "default" "$version"
-	pvm_info "Default version set to ${version}"
-}
-
-pvm_command_run() {
-	local version="$1"
-	shift
-
-	if [ -z "$version" ]; then
-		pvm_err "version required: pvm run <version> [args...]"
-		return 1
-	fi
-
-	version="$(pvm_resolve_version "$version")" || {
-		pvm_err "could not resolve version"
-		return 1
-	}
-	version="${version#v}"
-
 	if ! pvm_is_version_installed "$version"; then
 		pvm_err "Pike ${version} is not installed"
 		return 1
 	fi
 
-	local pike_bin
-	pike_bin="$(pvm_version_path "$version")/bin/pike"
-	exec "$pike_bin" "$@"
+	pvm_set_alias "default" "$version"
+	pvm_info "Set default version to '$version'"
+	return 0
 }
 
-pvm_command_exec() {
+pvm_command_run() {
 	local version="$1"
-	shift
+	shift 2>/dev/null || true
 
 	if [ -z "$version" ]; then
-		pvm_err "version required: pvm exec <version> <command> [args...]"
+		pvm_err "version required"
+		pvm_err "Usage: pvm run <version> [args...]"
 		return 1
 	fi
 
-	version="$(pvm_resolve_version "$version")" || {
-		pvm_err "could not resolve version"
-		return 1
-	}
 	version="${version#v}"
-
 	if ! pvm_is_version_installed "$version"; then
 		pvm_err "Pike ${version} is not installed"
 		return 1
@@ -1277,35 +1289,59 @@ pvm_command_exec() {
 
 	local bin_path
 	bin_path="$(pvm_version_bin_path "$version")"
+	PATH="${bin_path}:${PATH}" "${bin_path}/pike" "$@"
+}
 
-	PATH="${bin_path}:${PATH}" "$@"
+pvm_command_exec() {
+	local version="$1"
+	local cmd="$2"
+	shift 2>/dev/null || true
+
+	if [ -z "$version" ] || [ -z "$cmd" ]; then
+		pvm_err "version and command required"
+		pvm_err "Usage: pvm exec <version> <command> [args...]"
+		return 1
+	fi
+
+	version="${version#v}"
+	if ! pvm_is_version_installed "$version"; then
+		pvm_err "Pike ${version} is not installed"
+		return 1
+	fi
+
+	local bin_path
+	bin_path="$(pvm_version_bin_path "$version")"
+	PATH="${bin_path}:${PATH}" "$cmd" "$@"
 }
 
 pvm_command_which() {
 	local version="${1:-}"
 
+	# If no version, use current
 	if [ -z "$version" ]; then
-		# Use current version
 		if [ -n "${PVM_PIKE:-}" ] && [ -x "${PVM_PIKE}" ]; then
-			printf '%s\n' "$PVM_PIKE"
+			printf '%s\n' "${PVM_PIKE}"
 			return 0
 		fi
 		pvm_err "no active Pike version"
 		return 1
 	fi
 
-	version="$(pvm_resolve_version "$version")" || {
-		pvm_err "could not resolve version"
-		return 1
-	}
 	version="${version#v}"
-
 	if ! pvm_is_version_installed "$version"; then
 		pvm_err "Pike ${version} is not installed"
 		return 1
 	fi
 
-	printf '%s\n' "$(pvm_version_path "$version")/bin/pike"
+	local pike_path
+	pike_path="$(pvm_version_bin_path "$version")/pike"
+	if [ -x "$pike_path" ]; then
+		printf '%s\n' "$pike_path"
+		return 0
+	fi
+
+	pvm_err "Pike ${version} binary not found"
+	return 1
 }
 
 pvm_command_deactivate() {
@@ -1314,37 +1350,30 @@ pvm_command_deactivate() {
 		return 1
 	fi
 
-	pvm_strip_pike_env
 	pvm_strip_path
-	unset PVM_BIN
-	unset PVM_PIKE
-	hash -r 2>/dev/null || true
-	pvm_info "pvm deactivated"
+	pvm_strip_pike_env
+	unset PVM_BIN PVM_PIKE
+
+	pvm_info "pvm is no longer active"
 }
 
 pvm_command_cache() {
-	local subcmd="${1:-}"
+	local subcommand="${1:-}"
 
-	case "$subcmd" in
+	case "$subcommand" in
 		dir)
-			printf '%s\n' "$(pvm_cache_dir)"
+			pvm_cache_dir
 			;;
 		clear)
 			local cache_dir
 			cache_dir="$(pvm_cache_dir)"
 			if [ -d "$cache_dir" ]; then
-				rm -rf "${cache_dir:?}"/*
+				rm -rf "$cache_dir"/*
 				pvm_info "Cache cleared"
-			else
-				pvm_info "Cache directory does not exist"
 			fi
 			;;
-		"")
-			pvm_err "subcommand required: pvm cache <dir|clear>"
-			return 1
-			;;
 		*)
-			pvm_err "unknown cache subcommand: $subcmd"
+			pvm_err "unknown cache subcommand: $subcommand"
 			return 1
 			;;
 	esac
@@ -1364,6 +1393,26 @@ pvm_command_debug() {
 	pikerc="$(pvm_find_pikerc 2>/dev/null)" && printf '.pikerc: %s (%s)\n' "$pikerc" "$(head -1 "$pikerc" 2>/dev/null)" || printf '.pikerc: <not found>\n'
 	printf 'curl: %s\n' "$(pvm_has curl && echo 'yes' || echo 'no')"
 	printf 'wget: %s\n' "$(pvm_has wget && echo 'yes' || echo 'no')"
+}
+
+# Fish shell integration command dispatcher.
+# Outputs machine-readable key=value pairs for Fish to consume.
+pvm_command_fish() {
+	local subcommand="${1:-}"
+	shift 2>/dev/null || true
+
+	case "$subcommand" in
+		use)
+			pvm_fish_use_output "$@"
+			;;
+		deactivate)
+			pvm_fish_deactivate_output
+			;;
+		*)
+			pvm_err "unknown fish subcommand: $subcommand"
+			return 1
+			;;
+	esac
 }
 
 pvm_command_unload() {
@@ -1416,6 +1465,7 @@ pvm() {
 		cache)     pvm_command_cache "$@" ;;
 		debug)     pvm_command_debug ;;
 		unload)    pvm_command_unload ;;
+		_fish)     pvm_command_fish "$@" ;;
 		version|--version)
 			printf 'pvm v%s\n' "$_PVM_VERSION"
 			;;
