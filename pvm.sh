@@ -23,7 +23,8 @@ export PVM_DIR
 _PVM_VERSION="0.2.0"
 
 # Base URL for Pike downloads
-_PVM_PIKE_BASE_URL="https://pike.lysator.liu.se/pub/pike/all"
+_PVM_PIKE_DOWNLOAD_URL="https://pike.lysator.liu.se/pub/pike/all"
+_PVM_PIKE_LISTING_URL="https://pike.lysator.liu.se/download/pub/pike/all"
 
 # Default self-extracting archive extension
 _PVM_ARCHIVE_EXT=""
@@ -417,15 +418,15 @@ pvm_fetch_to_stdout() {
 pvm_parse_remote_versions() {
 	local html="$1"
 	printf '%s\n' "$html" | \
-		grep -oE 'href="([0-9]+\.[0-9]+\.[0-9]+)/"' | \
-		sed 's/href="//;s/\///' | \
+	grep -oE '[0-9]+\.[0-9]+\.[0-9]+/' | \
+	sed 's/\///' | \
 		sort -t. -k1,1n -k2,2n -k3,3n
 }
 
 # Get the latest version available remotely
 pvm_get_latest_remote_version() {
 	local listing
-	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_BASE_URL}/")" || return 1
+	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_LISTING_URL}/")" || return 1
 	local versions
 	versions="$(pvm_parse_remote_versions "$listing")" || return 1
 
@@ -459,15 +460,16 @@ pvm_find_binary_slug() {
 	arch="$(pvm_get_arch)"
 
 	local listing
-	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_BASE_URL}/${version}/")" || return 1
+	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_LISTING_URL}/${version}/")" || return 1
 
 	# Match: Pike-v{VER}-{OS}-*-{ARCH}
 
 	# Try exact OS + arch match
 	local matches
 	matches="$(printf '%s\n' "$listing" | \
-		grep -oE "href=\"(Pike-v${version}-${os}-[^\"]*-${arch}[^\"]*)\"" | \
-		sed 's/href="//;s/"$//' | \
+		grep -oE "href=\"[^\"]*Pike-v${version}-${os}-[^\"]*-${arch}[^\"]*\"" | \
+		sed 's/.*href="//;s/"$//' | \
+		sed 's|.*/||' | \
 		sort)"
 
 	if [ -z "$matches" ]; then
@@ -564,7 +566,7 @@ pvm_install_binary() {
 		return 1
 	}
 
-	local download_url="${_PVM_PIKE_BASE_URL}/${version}/${slug}"
+	local download_url="${_PVM_PIKE_DOWNLOAD_URL}/${version}/${slug}"
 	local cache_file
 	cache_file="$(pvm_cache_bin_dir)/${slug}"
 
@@ -621,27 +623,25 @@ pvm_install_source() {
 	local version_dir
 	version_dir="$(pvm_version_path "$version")"
 
-	# Check for git
-	if ! pvm_has git; then
-		pvm_err "git is required to install Pike from source"
+	# Download source tarball
+	local tarball="${source_dir}/Pike-v${version}.tar.gz"
+	mkdir -p "$(dirname "$source_dir")"
+	rm -rf "$source_dir"
+	pvm_download "${_PVM_PIKE_DOWNLOAD_URL}/${version}/Pike-v${version}.tar.gz" "$tarball" "Pike ${version} source"
+	if [ $? -ne 0 ]; then
+		pvm_err "failed to download Pike ${version} source tarball"
+		rm -rf "$source_dir"
 		return 1
 	fi
 
-	# Clone or update Pike repository
-	if [ -d "$source_dir/.git" ]; then
-		pvm_info "Updating existing source..."
-		(cd "$source_dir" && git fetch --tags && git checkout "$version" 2>/dev/null) || {
-			pvm_err "failed to update Pike source for version ${version}"
-			return 1
-		}
-	else
-		pvm_info "Cloning Pike repository..."
+	# Extract tarball (strip top-level directory from archive)
+	pvm_info "Extracting source tarball..."
+	mkdir -p "$source_dir"
+	tar -xzf "$tarball" --strip-components=1 -C "$source_dir"
+	if [ $? -ne 0 ]; then
+		pvm_err "failed to extract Pike source tarball"
 		rm -rf "$source_dir"
-		mkdir -p "$(dirname "$source_dir")"
-		git clone --branch "$version" --depth 1 "https://github.com/pike-lang/pike.git" "$source_dir" || {
-			pvm_err "failed to clone Pike repository"
-			return 1
-		}
+		return 1
 	fi
 
 	# Build Pike
@@ -649,22 +649,25 @@ pvm_install_source() {
 	cd "$source_dir" || return
 
 	# Configure
-	./configure --prefix="$version_dir" || {
+	./configure --prefix="$version_dir"
+	if [ $? -ne 0 ]; then
 		pvm_err "configuration failed"
 		return 1
-	}
+	fi
 
 	# Build
-	make -j"$(nproc)" || {
+	make -j"$(nproc)"
+	if [ $? -ne 0 ]; then
 		pvm_err "build failed"
 		return 1
-	}
+	fi
 
 	# Install
-	make install || {
+	make install
+	if [ $? -ne 0 ]; then
 		pvm_err "installation failed"
 		return 1
-	}
+	fi
 
 	# Verify installation
 	if [ ! -x "${version_dir}/bin/pike" ]; then
@@ -1147,7 +1150,7 @@ pvm_command_ls_remote() {
 
 	pvm_info "Fetching remote versions..."
 	local listing
-	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_BASE_URL}/")" || {
+	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_LISTING_URL}/")" || {
 		pvm_err "failed to fetch remote versions"
 		return 1
 	}
@@ -1465,7 +1468,7 @@ pvm_command_unload() {
 	unset -f pvm_command_alias pvm_command_unalias pvm_command_default
 	unset -f pvm_command_run pvm_command_exec pvm_command_which
 	unset -f pvm_command_deactivate pvm_command_cache pvm_command_debug pvm_command_unload
-	unset _PVM_LOADED _PVM_VERSION _PVM_PIKE_BASE_URL
+	unset _PVM_LOADED _PVM_VERSION _PVM_PIKE_DOWNLOAD_URL _PVM_PIKE_LISTING_URL
 	printf 'pvm unloaded\n'
 }
 
