@@ -80,6 +80,31 @@ pvm_check_build_prerequisites() {
 	return 0
 }
 
+
+
+# Show context around the first error in a build log
+pvm_show_build_error() {
+	local build_log="$1"
+	local error_line
+
+	# Find first error line in the log
+	error_line="$(grep -n -m1 -E 'error:' "$build_log" 2>/dev/null | head -1 | cut -d: -f1)"
+
+	if [ -n "$error_line" ]; then
+		# Show context around the first error
+		local start=$((error_line - 2))
+		[ "$start" -lt 1 ] && start=1
+		sed -n "${start},$((error_line + 5))p" "$build_log" >&2
+	else
+		# Fallback: show last 20 lines
+		tail -20 "$build_log" >&2
+	fi
+
+	printf '\nFull build log: %s\n' "$build_log" >&2
+}
+
+
+
 # ---------------------------------------------------------------------------
 # Platform detection
 # ---------------------------------------------------------------------------
@@ -738,33 +763,71 @@ pvm_install_source() {
 		return 1
 	fi
 
+
 	# Build Pike
-	pvm_info "Building Pike..."
+	local build_log="${source_dir}/build.log"
+	pvm_info "Configuring Pike ${version}..."
 	cd "$source_dir/src" || return
 
-	# Configure
-	# Configure — pass -Wno flags for GCC 14+ compatibility
-	# (older GCC versions silently ignore unknown -Wno-* flags)
-	./configure --prefix="$version_dir" \
-	    CFLAGS="-g -O2 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	{
+	    ./configure --prefix="$version_dir" \
+	        CFLAGS="-g -O2 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-alloc-size-larger-than -Wno-free-nonheap-object"
+	} >>"$build_log" 2>&1
 	if [ $? -ne 0 ]; then
-		pvm_err "configuration failed"
+		pvm_err "configuration failed (see ${build_log})"
+		pvm_show_build_error "$build_log"
 		return 1
 	fi
 
-	# Build
-	make -j"$(nproc)"
+	pvm_info "Building Pike ${version}..."
+	make -j"$(nproc)" >>"$build_log" 2>&1
 	if [ $? -ne 0 ]; then
-		pvm_err "build failed"
+		pvm_err "build failed (see ${build_log})"
+		pvm_show_build_error "$build_log"
 		return 1
 	fi
 
-	# Install
-	make install
+	pvm_info "Installing Pike ${version}..."
+	make install >>"$build_log" 2>&1
 	if [ $? -ne 0 ]; then
-		pvm_err "installation failed"
+		pvm_err "installation failed (see ${build_log})"
+		pvm_show_build_error "$build_log"
 		return 1
 	fi
+
+
 
 	# Verify installation
 	if [ ! -x "${version_dir}/bin/pike" ]; then
@@ -1559,7 +1622,7 @@ pvm_command_unload() {
 	unset -f pvm_resolve_version pvm_resolve_latest_installed pvm_resolve_latest
 	unset -f pvm_fetch pvm_fetch_to_stdout
 	unset -f pvm_parse_remote_versions pvm_get_latest_remote_version pvm_validate_install_version
-	unset -f pvm_find_binary_slug pvm_check_build_prerequisites
+	unset -f pvm_find_binary_slug pvm_check_build_prerequisites pvm_show_build_error
 	unset -f pvm_download pvm_extract_binary pvm_install_binary pvm_install_source
 	unset -f pvm_strip_path pvm_prepend_version_to_path
 	unset -f pvm_command_install pvm_command_use pvm_command_current
