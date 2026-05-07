@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Source build now passes `-Wno-*` flags to configure for GCC 14+ compatibility (suppresses implicit-function-declaration errors)
+
+### Added
+
+- `pvm install` now validates that the requested version exists remotely before downloading, and rejects invalid versions early with helpful suggestions
+- `pvm install --source` now checks that gcc/g++/make are available before downloading source, and reports missing prerequisites with platform-specific install instructions
+- `pvm install` detects and skips when a version is already installed (via version validation)
+
 ## [0.2.2] - 2026-05-07
+
+### Fixed
+
+- Fixed source build to `cd src/` before running configure
 
 ### Fixed
 

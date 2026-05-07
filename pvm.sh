@@ -45,6 +45,40 @@ pvm_info() {
 pvm_has() {
 	command -v "$1" >/dev/null 2>&1
 }
+pvm_check_build_prerequisites() {
+	local missing=""
+	local tool
+
+	for tool in cc c++ make; do
+		if ! pvm_has "$tool"; then
+			case "$tool" in
+				cc)  missing="${missing} gcc" ;;
+				c++) missing="${missing} g++" ;;
+				*)   missing="${missing} ${tool}" ;;
+			esac
+		fi
+	done
+
+	if [ -n "$missing" ]; then
+		pvm_err "source build requires:${missing}"
+		# Detect package manager and suggest install command
+		if pvm_has apt-get; then
+			pvm_err "Install with: sudo apt-get install build-essential"
+		elif pvm_has dnf; then
+			pvm_err "Install with: sudo dnf groupinstall \"Development Tools\""
+		elif pvm_has yum; then
+			pvm_err "Install with: sudo yum groupinstall \"Development Tools\""
+		elif pvm_has pacman; then
+			pvm_err "Install with: sudo pacman -S base-devel"
+		elif pvm_has apk; then
+			pvm_err "Install with: sudo apk add build-base"
+		else
+			pvm_err "Install your system's C compiler, C++ compiler, and make."
+		fi
+		return 1
+	fi
+	return 0
+}
 
 # ---------------------------------------------------------------------------
 # Platform detection
@@ -447,6 +481,63 @@ pvm_get_latest_remote_version() {
 	return 1
 }
 
+
+pvm_validate_install_version() {
+	local version="$1"
+
+	# Check if already installed
+	if pvm_is_version_installed "$version"; then
+		pvm_info "Pike ${version} is already installed"
+		return 0
+	fi
+
+	# Fetch remote listing and check version exists
+	local listing
+	listing="$(pvm_fetch_to_stdout "${_PVM_PIKE_LISTING_URL}/")" || {
+		# Network error — can't validate, proceed optimistically
+		return 0
+	}
+
+	local versions
+	versions="$(pvm_parse_remote_versions "$listing")" || return 0
+
+	# Check exact match
+	local ver
+	while IFS= read -r ver; do
+		[ -z "$ver" ] && continue
+		if [ "$ver" = "$version" ]; then
+			return 0
+		fi
+	done <<-EOF
+		${versions}
+	EOF
+
+	# Version not found — suggest similar versions
+	pvm_err "Pike ${version} is not a valid release version"
+
+	# Suggest matching major.minor versions
+	local mm
+	mm="$(pvm_version_major_minor "$version")"
+	local suggestions=""
+	while IFS= read -r ver; do
+		[ -z "$ver" ] && continue
+		case "$ver" in
+			"${mm}."*) suggestions="${suggestions}  ${ver}"$'\n' ;;
+		esac
+	done <<-EOF
+		${versions}
+	EOF
+
+	if [ -n "$suggestions" ]; then
+		pvm_err "Available ${mm}.* versions:"
+		printf '%s' "$suggestions" >&2
+	else
+		# Show latest few versions
+		pvm_err "Run 'pvm ls-remote' to see available versions."
+	fi
+
+	return 1
+}
 # ---------------------------------------------------------------------------
 # Binary matching
 # ---------------------------------------------------------------------------
@@ -616,6 +707,9 @@ pvm_install_source() {
 		return 0
 	fi
 
+	# Check build prerequisites before downloading
+	pvm_check_build_prerequisites || return 1
+
 	pvm_info "Installing Pike ${version} from source (this may take a while)..."
 
 	local source_dir
@@ -646,10 +740,13 @@ pvm_install_source() {
 
 	# Build Pike
 	pvm_info "Building Pike..."
-	cd "$source_dir" || return
+	cd "$source_dir/src" || return
 
 	# Configure
-	./configure --prefix="$version_dir"
+	# Configure — pass -Wno flags for GCC 14+ compatibility
+	# (older GCC versions silently ignore unknown -Wno-* flags)
+	./configure --prefix="$version_dir" \
+	    CFLAGS="-g -O2 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion"
 	if [ $? -ne 0 ]; then
 		pvm_err "configuration failed"
 		return 1
@@ -1019,6 +1116,9 @@ pvm_command_install() {
 
 	# Strip leading 'v'
 	version="${version#v}"
+
+	# Validate version exists remotely
+	pvm_validate_install_version "$version" || return 1
 
 	# Install from source if requested or if binary not available
 	if [ "$force_source" -eq 1 ]; then
@@ -1458,8 +1558,8 @@ pvm_command_unload() {
 	unset -f pvm_find_pikerc pvm_read_pikerc
 	unset -f pvm_resolve_version pvm_resolve_latest_installed pvm_resolve_latest
 	unset -f pvm_fetch pvm_fetch_to_stdout
-	unset -f pvm_parse_remote_versions pvm_get_latest_remote_version
-	unset -f pvm_find_binary_slug
+	unset -f pvm_parse_remote_versions pvm_get_latest_remote_version pvm_validate_install_version
+	unset -f pvm_find_binary_slug pvm_check_build_prerequisites
 	unset -f pvm_download pvm_extract_binary pvm_install_binary pvm_install_source
 	unset -f pvm_strip_path pvm_prepend_version_to_path
 	unset -f pvm_command_install pvm_command_use pvm_command_current
