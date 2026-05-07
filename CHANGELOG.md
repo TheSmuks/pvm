@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
+
+
+
 ### Fixed
 
-- Source build now passes `-Wno-*` flags to configure for GCC 14+ compatibility (suppresses implicit-function-declaration errors)
+cv|fw|- Source build now passes targeted `-Wno-*` flags to configure for GCC 14+ compatibility (suppresses implicit-function-declaration, implicit-int, int-conversion, alloc-size-larger-than, and free-nonheap-object warnings in Pike's code)
+fw|- Source build error output now shows the first error from the build log with context, instead of the last 20 lines which often only show trailing warnings
+
+
+
+
+
+
 
 ### Added
 
