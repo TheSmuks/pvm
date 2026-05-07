@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-07
+
 ### Fixed
 
 	- Fixed `pvm install` by correcting URL paths:
@@ -15,9 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	- Fixed version parsing regex to handle full-path hrefs from lysator listing
 	- Rewrote source install to download tarball from lysator instead of git clone
 	- Replaced the dead `if/fi` Fish detection block in `pvm.sh` with a compatible one-liner
-
-- Fixed 4 shellcheck warnings in `pvm.sh` (SC2155, SC2164, SC2115)
-- `install.sh` shows the correct source command for Fish shell users
+	- Fixed 4 shellcheck warnings in `pvm.sh` (SC2155, SC2164, SC2115)
+	- `install.sh` shows the correct source command for Fish shell users
 
 ## [0.2.1] - 2026-05-06
 
