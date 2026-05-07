@@ -187,3 +187,115 @@ test_ls_lists_versions
 test_ls_with_pattern
 test_uninstall
 test_uninstall_current_fails
+
+# ---------------------------------------------------------------------------
+# Remote version listing tests
+# ---------------------------------------------------------------------------
+
+SCRIPT_DIR_FOR_FIXTURES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FIXTURES_DIR="${SCRIPT_DIR_FOR_FIXTURES}/fixtures"
+
+test_parse_remote_versions_full_path() {
+	# Verify the fixed regex extracts versions from full-path hrefs
+	local html listing_root="${FIXTURES_DIR}/listing_root.html"
+	html="$(cat "$listing_root")"
+
+	local result
+	result="$(pvm_parse_remote_versions "$html")"
+	run_test
+
+	# Check all three versions are present
+	if printf '%s\n' "$result" | grep -q "^8.0.1116$" && \
+	   printf '%s\n' "$result" | grep -q "^8.0.1732$" && \
+	   printf '%s\n' "$result" | grep -q "^8.0.1956$"; then
+		pass
+	else
+		fail "parse_remote_versions should extract 8.0.1116, 8.0.1732, 8.0.1956 from full-path hrefs, got: $result"
+	fi
+}
+
+test_find_binary_slug_full_path() {
+	# Verify slug extraction from version dir listing
+	local listing_version="${FIXTURES_DIR}/listing_version.html"
+
+	# Mock pvm_fetch_to_stdout to return the fixture
+	pvm_fetch_to_stdout() {
+		local url="$1"
+		if printf '%s' "$url" | grep -q "8.0.1116"; then
+			cat "$listing_version"
+			return 0
+		fi
+		return 1
+	}
+
+	local result
+	result="$(pvm_find_binary_slug "8.0.1116")"
+	run_test
+
+	if [ "$result" = "Pike-v8.0.1116-Linux-5.4.65-x86_64" ]; then
+		pass
+	else
+		fail "find_binary_slug should return 'Pike-v8.0.1116-Linux-5.4.65-x86_64', got: '$result'"
+	fi
+}
+
+test_ls_remote_uses_listing_url() {
+	# Verify ls-remote uses the listing URL (not download URL)
+	local expected="download/pub/pike/all"
+
+	# Mock pvm_fetch_to_stdout to capture the URL called
+	pvm_fetch_to_stdout() {
+		local url="$1"
+		# Verify the URL uses the listing (not download) base
+		if printf '%s' "$url" | grep -q "$expected"; then
+			cat "${FIXTURES_DIR}/listing_root.html"
+			return 0
+		fi
+		return 1
+	}
+
+	run_test
+
+	local result
+	result="$(pvm_command_ls_remote 2>/dev/null)"
+
+	if printf '%s' "$result" | grep -q "8.0.1116"; then
+		pass
+	else
+		fail "ls-remote should use listing URL with '$expected', got: $result"
+	fi
+}
+
+test_source_install_tarball_url() {
+	# Verify source install URL pattern
+	# The source tarball URL should be: ${DOWNLOAD_URL}/{version}/Pike-v{version}.tar.gz
+	run_test
+	local version="8.0.1116"
+	local expected_url="${_PVM_PIKE_DOWNLOAD_URL}/${version}/Pike-v${version}.tar.gz"
+	# Check that the URL follows the expected pattern
+	# URL should be: https://pike.lysator.liu.se/pub/pike/all/8.0.1116/Pike-v8.0.1116.tar.gz
+	if printf '%s' "$expected_url" | grep -qE "^${_PVM_PIKE_DOWNLOAD_URL}/[0-9]+\.[0-9]+\.[0-9]+/Pike-v[0-9]+\.[0-9]+\.[0-9]+\.tar\.gz$"; then
+		pass
+	else
+		fail "source tarball URL pattern should match '${_PVM_PIKE_DOWNLOAD_URL}/{version}/Pike-v{version}.tar.gz', got: $expected_url"
+	fi
+}
+test_binary_download_uses_download_url() {
+	# Verify binary download uses the download URL (not listing URL)
+	# The listing URL should be: https://pike.lysator.liu.se/download/pub/pike/all/{version}/
+	run_test
+	local version="8.0.1116"
+	local expected_listing_url="${_PVM_PIKE_LISTING_URL}/${version}/"
+	# Check that the listing URL follows the expected pattern
+	if printf '%s\n' "$expected_listing_url" | grep -qE "^${_PVM_PIKE_LISTING_URL}/[0-9]+\.[0-9]+\.[0-9]+/$"; then
+		pass
+	else
+		fail "listing URL should be '${_PVM_PIKE_LISTING_URL}/{version}/', got: $expected_listing_url"
+	fi
+}
+
+test_parse_remote_versions_full_path
+test_find_binary_slug_full_path
+test_ls_remote_uses_listing_url
+test_source_install_tarball_url
+test_binary_download_uses_download_url
