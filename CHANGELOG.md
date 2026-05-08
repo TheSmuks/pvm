@@ -12,9 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+- Source build now passes targeted `-Wno-*` flags to configure for GCC 14+ compatibility (suppresses implicit-function-declaration, implicit-int, int-conversion, alloc-size-larger-than, and free-nonheap-object warnings in Pike's code)
+- Source build error output now shows the first error from the build log with context, instead of the last 20 lines which often only show trailing warnings
+- `pvm install --source` now retries with `-j1` when a parallel build fails, working around Pike's Makefile race conditions on multi-core machines (e.g. concurrent mkdir of 'lib/')
+- `pvm_show_build_error` grep pattern now matches `Error N`, `no such file`, `cannot create directory`, and `No rule to make target` in addition to `error:`, surfacing actual build failures instead of falling through to trailing noise
 
-cv|fw|- Source build now passes targeted `-Wno-*` flags to configure for GCC 14+ compatibility (suppresses implicit-function-declaration, implicit-int, int-conversion, alloc-size-larger-than, and free-nonheap-object warnings in Pike's code)
-fw|- Source build error output now shows the first error from the build log with context, instead of the last 20 lines which often only show trailing warnings
 
 
 
