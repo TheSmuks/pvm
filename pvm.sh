@@ -812,13 +812,10 @@ pvm_install_source() {
 	fi
 
 	pvm_info "Building Pike ${version}..."
+	# Pre-create directories that Pike's Makefile races to mkdir under -j$(nproc)
+	# (TOCTOU race: test -d X || mkdir X fails when two parallel jobs both pass the test)
+	mkdir -p lib lib/modules lib/include include
 	make -j"$(nproc)" >>"$build_log" 2>&1
-	if [ $? -ne 0 ]; then
-		# Retry with single-job make if parallel build fails (Pike's Makefile
-		# has known race conditions with parallel builds, e.g. mkdir 'lib')
-		pvm_info "Parallel build failed, retrying with single job..."
-		make -j1 >>"$build_log" 2>&1
-	fi
 	if [ $? -ne 0 ]; then
 		pvm_err "build failed (see ${build_log})"
 		pvm_show_build_error "$build_log"
