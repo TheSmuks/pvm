@@ -88,7 +88,7 @@ pvm_show_build_error() {
 	local error_line
 
 	# Find first error line in the log
-	error_line="$(grep -n -m1 -E 'error:' "$build_log" 2>/dev/null | head -1 | cut -d: -f1)"
+	error_line="$(grep -n -m1 -E '(^|: )error:|Error [0-9]|[Nn]o such [Ff]ile|cannot create directory|No rule to make target' "$build_log" 2>/dev/null | head -1 | cut -d: -f1)"
 
 	if [ -n "$error_line" ]; then
 		# Show context around the first error
@@ -813,6 +813,12 @@ pvm_install_source() {
 
 	pvm_info "Building Pike ${version}..."
 	make -j"$(nproc)" >>"$build_log" 2>&1
+	if [ $? -ne 0 ]; then
+		# Retry with single-job make if parallel build fails (Pike's Makefile
+		# has known race conditions with parallel builds, e.g. mkdir 'lib')
+		pvm_info "Parallel build failed, retrying with single job..."
+		make -j1 >>"$build_log" 2>&1
+	fi
 	if [ $? -ne 0 ]; then
 		pvm_err "build failed (see ${build_log})"
 		pvm_show_build_error "$build_log"
