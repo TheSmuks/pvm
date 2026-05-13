@@ -723,6 +723,7 @@ pvm_install_binary() {
 	return 0
 }
 
+
 # Install Pike from source
 pvm_install_source() {
 	local version="$1"
@@ -763,7 +764,6 @@ pvm_install_source() {
 		return 1
 	fi
 
-
 	# Build Pike
 	local build_log="${source_dir}/build.log"
 	pvm_info "Configuring Pike ${version}..."
@@ -803,7 +803,7 @@ pvm_install_source() {
 
 	{
 	    ./configure --prefix="$version_dir" \
-	        CFLAGS="-g -O2 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-alloc-size-larger-than -Wno-free-nonheap-object"
+	        CFLAGS="-g -O2 -std=gnu17 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-alloc-size-larger-than -Wno-free-nonheap-object"
 	} >>"$build_log" 2>&1
 	if [ $? -ne 0 ]; then
 		pvm_err "configuration failed (see ${build_log})"
