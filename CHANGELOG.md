@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Source build error output now shows the first error from the build log with context, instead of the last 20 lines which often only show trailing warnings
 - `pvm install --source` now pre-creates `lib/`, `lib/modules/`, `lib/include/`, and `include/` directories before building, eliminating TOCTOU race conditions in Pike's Makefile when using parallel `make -j$(nproc)`
 - `pvm_show_build_error` grep pattern now matches `Error N`, `no such file`, `cannot create directory`, and `No rule to make target` in addition to `error:`, surfacing actual build failures instead of falling through to trailing noise
+- Source build now passes `-std=gnu17` to GCC, fixing compilation on GCC 16+ which defaults to C23 where `true` and `false` are keywords and conflict with variable names in Pike's HTTPLoop module
 
 
 
