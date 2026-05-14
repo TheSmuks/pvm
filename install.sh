@@ -118,6 +118,7 @@ if [ -n "$PROFILE" ]; then
 else
 	info "Could not detect shell profile. Add these lines to your shell config:"
 	printf '\n  export PVM_DIR="%s"\n' "$PVM_DIR"
+	# shellcheck disable=SC2016  # $PVM_DIR must be literal — printed for user's shell config
 	printf '  [ -s "$PVM_DIR/pvm.sh" ] && . "$PVM_DIR/pvm.sh"\n\n'
 fi
 

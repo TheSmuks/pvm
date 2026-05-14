@@ -22,7 +22,7 @@ test_ls_empty() {
 	local result
 	result="$(pvm_command_ls)"
 	run_test
-	if [ -z "$(printf '%s' "$result" | grep -v "^pvm:")" ]; then
+	if ! printf '%s' "$result" | grep -qv '^pvm:'; then
 		pass
 	else
 		fail "ls should show nothing when no versions installed"

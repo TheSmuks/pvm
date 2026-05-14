@@ -747,8 +747,7 @@ pvm_install_source() {
 	local tarball="${source_dir}/Pike-v${version}.tar.gz"
 	mkdir -p "$(dirname "$source_dir")"
 	rm -rf "$source_dir"
-	pvm_download "${_PVM_PIKE_DOWNLOAD_URL}/${version}/Pike-v${version}.tar.gz" "$tarball" "Pike ${version} source"
-	if [ $? -ne 0 ]; then
+	if ! pvm_download "${_PVM_PIKE_DOWNLOAD_URL}/${version}/Pike-v${version}.tar.gz" "$tarball" "Pike ${version} source"; then
 		pvm_err "failed to download Pike ${version} source tarball"
 		rm -rf "$source_dir"
 		return 1
@@ -757,8 +756,7 @@ pvm_install_source() {
 	# Extract tarball (strip top-level directory from archive)
 	pvm_info "Extracting source tarball..."
 	mkdir -p "$source_dir"
-	tar -xzf "$tarball" --strip-components=1 -C "$source_dir"
-	if [ $? -ne 0 ]; then
+	if ! tar -xzf "$tarball" --strip-components=1 -C "$source_dir"; then
 		pvm_err "failed to extract Pike source tarball"
 		rm -rf "$source_dir"
 		return 1
@@ -801,11 +799,9 @@ pvm_install_source() {
 
 
 
-	{
-	    ./configure --prefix="$version_dir" \
-	        CFLAGS="-g -O2 -std=gnu17 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-alloc-size-larger-than -Wno-free-nonheap-object"
-	} >>"$build_log" 2>&1
-	if [ $? -ne 0 ]; then
+	if ! ./configure --prefix="$version_dir" \
+	    CFLAGS="-g -O2 -std=gnu17 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-int-conversion -Wno-alloc-size-larger-than -Wno-free-nonheap-object" \
+	    >>"$build_log" 2>&1; then
 		pvm_err "configuration failed (see ${build_log})"
 		pvm_show_build_error "$build_log"
 		return 1
@@ -815,16 +811,14 @@ pvm_install_source() {
 	# Pre-create directories that Pike's Makefile races to mkdir under -j$(nproc)
 	# (TOCTOU race: test -d X || mkdir X fails when two parallel jobs both pass the test)
 	mkdir -p lib lib/modules lib/include include
-	make -j"$(nproc)" >>"$build_log" 2>&1
-	if [ $? -ne 0 ]; then
+	if ! make -j"$(nproc)" >>"$build_log" 2>&1; then
 		pvm_err "build failed (see ${build_log})"
 		pvm_show_build_error "$build_log"
 		return 1
 	fi
 
 	pvm_info "Installing Pike ${version}..."
-	make install >>"$build_log" 2>&1
-	if [ $? -ne 0 ]; then
+	if ! make install >>"$build_log" 2>&1; then
 		pvm_err "installation failed (see ${build_log})"
 		pvm_show_build_error "$build_log"
 		return 1
@@ -1351,7 +1345,7 @@ pvm_command_ls_remote() {
 		${versions}
 	EOF
 
-	[ "$found" -eq 0 ] && pvm_err "No versions found${pattern:+ matching '$pattern'}"
+	[ "$found" -eq 0 ] && pvm_err "No versions found${pattern:+ matching \"$pattern\"}"
 	return 0
 }
 

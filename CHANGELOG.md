@@ -36,17 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed source build to `cd src/` before running configure
-
-### Fixed
-
-	- Fixed `pvm install` by correcting URL paths:
-	  - Binary download: `https://pike.lysator.liu.se/pub/pike/all/{version}/`
-	  - Listing directory: `https://pike.lysator.liu.se/download/pub/pike/all/{version}/`
-	- Fixed version parsing regex to handle full-path hrefs from lysator listing
-	- Rewrote source install to download tarball from lysator instead of git clone
-	- Replaced the dead `if/fi` Fish detection block in `pvm.sh` with a compatible one-liner
-	- Fixed 4 shellcheck warnings in `pvm.sh` (SC2155, SC2164, SC2115)
-	- `install.sh` shows the correct source command for Fish shell users
+- Fixed `pvm install` by correcting URL paths:
+  - Binary download: `https://pike.lysator.liu.se/pub/pike/all/{version}/`
+  - Listing directory: `https://pike.lysator.liu.se/download/pub/pike/all/{version}/`
+- Fixed version parsing regex to handle full-path hrefs from lysator listing
+- Rewrote source install to download tarball from lysator instead of git clone
+- Replaced the dead `if/fi` Fish detection block in `pvm.sh` with a compatible one-liner
+- Fixed 4 shellcheck warnings in `pvm.sh` (SC2155, SC2164, SC2115)
+- `install.sh` shows the correct source command for Fish shell users
 
 ## [0.2.1] - 2026-05-06
 

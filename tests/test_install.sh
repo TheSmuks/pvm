@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # test_install.sh — Tests for install/use/current commands
 # Sourced by run_tests.sh
+# shellcheck disable=SC2317  # Mock function overrides are intentionally "unreachable"
 
 # Create a fake Pike installation for testing
 setup_fake_installation() {
